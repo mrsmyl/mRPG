@@ -1,7 +1,10 @@
-# ChangeLog for mRPG
-# Copyright 2012 Greg (NeWtoz@mozor.net) & Richard (richard@mozor.net);
-# Licensed under the Creative Commons BY-NC-SA license. 
+ChangeLog for mRPG
+========
+Copyright 2012 [Greg](https://github.com/newtoz) & [Richard](https://github.com/richard4339)  
+Licensed under the Creative Commons BY-NC-SA license. 
 
-IRCRPG v1.0.0
-    April 20, 2012:
-	-Inititial creation
+mRPG v0.0.0
+--------
+April 20, 2012
+
+* Inititial creation
