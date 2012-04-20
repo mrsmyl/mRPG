@@ -1,4 +1,4 @@
-mRPG 2.0
+mRPG 1.0
 ========
 A reinterpretation of the IdleRPG
 
