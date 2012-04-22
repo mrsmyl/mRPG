@@ -53,7 +53,7 @@ class mrpg:
 		self.parent.msg(self.channel, msg)
 
 	def performPenalty(self, user, reason):
-		if is_started = 1
+		if is_started == 1:
 			#commented out due to the spam it creates in IRC and just make it print to console
 			#self.msg(user + " has earned a penalty for: " + reason)
 			print "Penalty"
@@ -111,6 +111,11 @@ class DBPool:
 		query = 'UPDATE `users` SET tonextlevel = tonextlevel + ' + time + ' where username=?'
 		return self.__dbpool.runQuery(query, (username,))
 
+        def register_user(self, reg_username, reg_password, reg_char_class):
+                query = 'INSERT INTO `users` (id,username,password,level,tonextlevel,char_class,hostname) VALUES (NULL,?,?,NULL,NULL,?,NULL)'
+                return self.__dbpool.runQuery(query, (reg_username, reg_password, reg_char_class))
+
+
 class Bot(irc.IRCClient):
 	"""A logging IRC bot."""
 
@@ -160,7 +165,7 @@ class Bot(irc.IRCClient):
                                         self.db = DBPool('mrpg.db')
                                         self.db.register_user(reg_username,reg_password,reg_char_class)
                                         self.db.shutdown("")
-                                        self.notice(user, "Created new character" + reg_username)
+                                        self.notice(user, "Created new character " + reg_username)
 
 		# Otherwise check to see if it is a message directed at me
 		if msg.startswith(self.nickname + ":"):
