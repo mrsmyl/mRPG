@@ -122,6 +122,7 @@ class Bot(irc.IRCClient):
 	def signedOn(self):
 		"""Called when bot has succesfully signed on to server."""
 		self.join(self.factory.channel)
+		self.nickservIdentify()
 
 	def joined(self, channel):
 		"""This will get called when the bot joins the channel."""
@@ -171,6 +172,11 @@ class Bot(irc.IRCClient):
 		"""
 		return nickname + '^'
 
+	def nickservRegister(self):	
+		self.msg("nickserv", "register " + self.factory.nickserv_password + " " + self.factory.nickserv_email)
+	
+	def nickservIdentify(self):
+		self.msg("nickserv", "identify " + self.factory.nickserv_password)
 class BotFactory(protocol.ClientFactory):
 	"""A factory for Bots.
 
@@ -184,10 +190,11 @@ class BotFactory(protocol.ClientFactory):
 		channel = config.get('IRC', 'channel')
 		nickname = config.get('IRC', 'nickname')
 
-		self.channel = channel
-		self.nickname = nickname
-		self.server = server
-		self.port = port
+		self.channel = config.get('IRC', 'channel')
+		self.nickname = config.get('IRC', 'nickname')
+		self.nickserv_password = config.get('IRC', 'nickserv_password')
+		self.nickserv_email = config.get('IRC', 'nickserv_email')
+		
 		# self.db = DBPool('mrpg.db')
 		
 		# DeferredList seems more adapted than chained callbacks in this sort of cases
