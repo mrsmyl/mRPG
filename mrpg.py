@@ -20,6 +20,7 @@ import time, sys
 import ConfigParser
 
 timespan = 10.0
+is_started = 0
 
 def printResult(result):
 	for r in result:
@@ -37,35 +38,44 @@ class mrpg:
 
 		# Start the reactor task that repeatedly loops through actions
 		self.l.start(timespan) # call every 10 seconds for now
-
+		global is_started
+		is_started = 1
 		self.msg("Initialization complete")
 
 	def stop(self):
 		self.msg("I think my loop needs to stop")
 		self.l.stop()
+		global is_started
+		is_started = 0
 		self.msg("It stopped")
 
 	def msg(self, msg):
 		self.parent.msg(self.channel, msg)
 
 	def performPenalty(self, user, reason):
-		self.msg(user + " has earned a penalty for: " + reason)
+		if is_started = 1
+			#commented out due to the spam it creates in IRC and just make it print to console
+			#self.msg(user + " has earned a penalty for: " + reason)
+			print "Penalty"
 
 	def rpg(self):
-		self.msg("This is the looping call that will do stuff")
+		#commented out due to the spam it creates in IRC and just make it print to console
+                print "10 second loop"
+		#self.msg("This is the looping call that will do stuff")
 		self.db = DBPool('mrpg.db')
 		self.db.update_user_time('richard',timespan * -1)
 		self.db.shutdown("")
 
 class User:
-	def __init__(self, username, char_class, password):
+	def __init__(self, id, username, char_class, password, level, tonextlevel, hostname):
 		self.username = username
 		self.char_class = char_class
 		self.password = password
+	        self.level = level
+                self.tonextlevel = tonextlevel
+                self.hostname = hostname
 	def render(self):
-		msg = "Mr '%s %s' is connected under '%s'" % (self.password, 
-														 self.char_class,
-														 self.username,)
+                msg = "%s %s %s %i %i %s" % (self.username,self.char_class,self.password, self.level, self.tonextlevel, self.hostname)
 		return msg
 class DBPool:
 	"""
@@ -87,8 +97,8 @@ class DBPool:
 		"""
 			Build user from dbentries
 		"""
-		username, char_class, password = dbentries[0]
-		return User(username, char_class, password)
+                id, username, password, level, tonextlevel, char_class, hostname = dbentries[0]
+                return User(id, username, char_class, password, level, tonextlevel, hostname)
 	def get_user_user(self, username):
 		"""
 			Build associated user object
@@ -132,14 +142,25 @@ class Bot(irc.IRCClient):
 		"""This will get called when the bot receives a message."""
 		user = user.split('!', 1)[0]
 		
-		# Check to see if they're sending me a private message
-		if channel == self.nickname:
-			msg_out = "It isn't nice to whisper!  Play nice with the group."
-			self.notice(user, msg_out)
-			self.msg(self.factory.channel, msg)
-			return
-
-		self.mrpg.performPenalty(user, "channel message")
+                # Check to see if they're sending me a private message
+                if channel == self.nickname:
+                        # msg_out = "It isn't nice to whisper!  Play nice with the group."
+                        #self.notice(user, msg_out)
+                        #self.msg(self.factory.channel, msg)
+                        if msg.lower() == "register":
+                                self.notice(user, "To register: /msg mBot register <char name> <password>  <char class>")
+                        else:
+                                msg_split = msg.split(' ')
+                                #ASOLUTELY NO ERROR CORRECTION YET!!
+                                if msg_split[0] == "register":
+                                        reg_username = msg_split[1]
+                                        reg_password = msg_split[2]
+                                        reg_char_class = msg_split[3::1]
+                                        reg_char_class = ' '.join(reg_char_class)
+                                        self.db = DBPool('mrpg.db')
+                                        self.db.register_user(reg_username,reg_password,reg_char_class)
+                                        self.db.shutdown("")
+                                        self.notice(user, "Created new character" + reg_username)
 
 		# Otherwise check to see if it is a message directed at me
 		if msg.startswith(self.nickname + ":"):
@@ -242,3 +263,29 @@ if __name__ == '__main__':
 
 	# run bot
 	reactor.run()
+
+
+
+
+
+
+
+
+# These two definitions will be used later for passwords.
+# So ignore this for now
+
+#def set_password(self, raw_password):
+#    import random
+#    algo = 'sha1'
+#    salt = get_hexdigest(algo, str(random.random()), str(random.random()))[:5]
+#    hsh = get_hexdigest(algo, salt, raw_password)
+#    self.password = '%s$%s$%s' % (algo, salt, hsh)
+
+#def check_password(raw_password, enc_password):
+#    """
+#    Returns a boolean of whether the raw_password was correct. Handles
+#    encryption formats behind the scenes.
+#    """
+#    algo, salt, hsh = enc_password.split('$')
+#    return hsh == get_hexdigest(algo, salt, raw_password)
+
