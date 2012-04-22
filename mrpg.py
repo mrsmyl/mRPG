@@ -67,15 +67,15 @@ class mrpg:
 		self.db.shutdown("")
 
 class User:
-	def __init__(self, id, username, char_class, password, level, tonextlevel, hostname):
+	def __init__(self, id, username, char_class, password, level, ttl, hostname):
 		self.username = username
 		self.char_class = char_class
 		self.password = password
 	        self.level = level
-                self.tonextlevel = tonextlevel
+                self.ttl = ttl
                 self.hostname = hostname
 	def render(self):
-                msg = "%s %s %s %i %i %s" % (self.username,self.char_class,self.password, self.level, self.tonextlevel, self.hostname)
+                msg = "%s %s %s %i %i %s" % (self.username,self.char_class,self.password, self.level, self.ttl, self.hostname)
 		return msg
 class DBPool:
 	"""
@@ -97,8 +97,8 @@ class DBPool:
 		"""
 			Build user from dbentries
 		"""
-                id, username, password, level, tonextlevel, char_class, hostname = dbentries[0]
-                return User(id, username, char_class, password, level, tonextlevel, hostname)
+                id, username, password, level, ttl, char_class, hostname = dbentries[0]
+                return User(id, username, char_class, password, level, ttl, hostname)
 	def get_user_user(self, username):
 		"""
 			Build associated user object
@@ -108,11 +108,11 @@ class DBPool:
 												  self.build_user)
 	def update_user_time(self, username, time):
 		time = str(time)
-		query = 'UPDATE `users` SET tonextlevel = tonextlevel + ' + time + ' where username=?'
+		query = 'UPDATE `users` SET ttl = ttl + ' + time + ' where username=?'
 		return self.__dbpool.runQuery(query, (username,))
 
         def register_user(self, reg_username, reg_password, reg_char_class):
-                query = 'INSERT INTO `users` (id,username,password,level,tonextlevel,char_class,hostname) VALUES (NULL,?,?,NULL,NULL,?,NULL)'
+                query = 'INSERT INTO `users` (id,username,password,level,ttl,char_class,hostname) VALUES (NULL,?,?,NULL,NULL,?,NULL)'
                 return self.__dbpool.runQuery(query, (reg_username, reg_password, reg_char_class))
 
 
