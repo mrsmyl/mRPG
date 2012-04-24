@@ -12,14 +12,15 @@
 from twisted.words.protocols import irc
 from twisted.internet import reactor, protocol, task
 from twisted.python import log
-from twisted.enterprise.adbapi import ConnectionPool
-from twisted.internet.defer import DeferredList
+from twisted.enterprise import adbapi
+# from twisted.internet.defer import DeferredList
 
 # system imports
 import time, sys
 import ConfigParser
 
 timespan = 10.0
+min_time = 30
 is_started = 0
 
 def printResult(result):
@@ -31,13 +32,15 @@ class mrpg:
 		self.parent = parent
 		self.channel = parent.factory.channel
 		self.l = task.LoopingCall(self.rpg)
+		self.db = DBPool('mrpg.db')
+		self.db.mrpg = self
 
 	def start(self):
 		self.msg("Starting mrpg")
 		self.msg("Please standby")
 
 		# Start the reactor task that repeatedly loops through actions
-		self.l.start(timespan) # call every 10 seconds for now
+		self.l.start(timespan)
 		global is_started
 		is_started = 1
 		self.msg("Initialization complete")
@@ -62,28 +65,32 @@ class mrpg:
 		#commented out due to the spam it creates in IRC and just make it print to console
                 print "10 second loop"
 		#self.msg("This is the looping call that will do stuff")
-		self.db = DBPool('mrpg.db')
-		self.db.update_user_time('richard',timespan * -1)
-		self.db.shutdown("")
+		
+		
+		# self.db.register_user("richard", "abc123", "Captain Awesome")
+		# self.db.register_user("newtoz", "abc123", "Super Sleuth")
+		# self.db.register_user("george", "abc123", "not a george")
+		# self.db.register_user("moo", "abc123", "cow")
+		self.db.updateAllUsersTime(timespan * -1)
+		
+		# s = self.db.executeQuery("SELECT ttl FROM users WHERE username = ?", ("richard",))
+		# s = s.addCallback(self.db.getResults)
+		# print s
+		
+		self.db.levelUp()
+		
+		self.db.getUser()
+		
+		# self.db.shutdown("")
 
-class User:
-	def __init__(self, id, username, char_class, password, level, ttl, hostname):
-		self.username = username
-		self.char_class = char_class
-		self.password = password
-	        self.level = level
-                self.ttl = ttl
-                self.hostname = hostname
-	def render(self):
-                msg = "%s %s %s %i %i %s" % (self.username,self.char_class,self.password, self.level, self.ttl, self.hostname)
-		return msg
+
 class DBPool:
 	"""
 		Sqlite connection pool
 	"""
 	def __init__(self, dbname):
 		self.dbname = dbname
-		self.__dbpool = ConnectionPool('sqlite3', self.dbname, check_same_thread=False)
+		self.__dbpool = adbapi.ConnectionPool('sqlite3', self.dbname, check_same_thread=False)
 
 	def shutdown(self, callback_msg):
 		"""
@@ -92,28 +99,57 @@ class DBPool:
 				garbage collector doesn't shutdown associated thread
 		"""
 		self.__dbpool.close()
-		
-	def build_user(self, dbentries):
-		"""
-			Build user from dbentries
-		"""
-                id, username, password, level, ttl, char_class, hostname = dbentries[0]
-                return User(id, username, char_class, password, level, ttl, hostname)
-	def get_user_user(self, username):
-		"""
-			Build associated user object
-		"""
-		query = 'SELECT username, char_class, password from `users` where username=?'
-		return self.__dbpool.runQuery(query, (username,)).addCallback(
-												  self.build_user)
-	def update_user_time(self, username, time):
-		time = str(time)
-		query = 'UPDATE `users` SET ttl = ttl + ' + time + ' where username=?'
-		return self.__dbpool.runQuery(query, (username,))
 
-        def register_user(self, reg_username, reg_password, reg_char_class):
-                query = 'INSERT INTO `users` (id,username,password,level,ttl,char_class,hostname) VALUES (NULL,?,?,NULL,NULL,?,NULL)'
-                return self.__dbpool.runQuery(query, (reg_username, reg_password, reg_char_class))
+	def getUser(self):
+		query = "SELECT * FROM users"
+		s = self.__dbpool.runQuery(query).addCallback(self.showUser)
+	
+	def showUser(self, output):
+		for i in output:
+			message = str(i[1]) + " will reach the next level in " + str(i[4]) + " seconds."
+			# self.mrpg.msg(message)
+			print message
+
+	def levelUp(self):
+		query = "SELECT username, level, ttl FROM users WHERE ttl < 0"
+		s = self.__dbpool.runQuery(query).addCallback(self.showLevelUp)
+	
+	def showLevelUp(self, output):
+		for i in output:
+			user = str(i[0])
+			level = int(i[1])
+			
+			new_level = level + 1
+			ttl = min_time * new_level
+			
+			message = user + " has reached level " +str(new_level)
+			self.mrpg.msg(message)
+			message = user + " will reach the next level in " +str(ttl) + " seconds"
+			self.mrpg.msg(message)
+			self.levelUpUser(user, level)
+			print user + " has reached level " +str(new_level)
+			
+
+	def getResults(self, output):
+		return output
+
+	def executeQuery(self, query, args):
+		return self.__dbpool.runQuery(query, args)
+
+	def levelUpUser(self, user, level):
+		new_level = level + 1
+		ttl = min_time * new_level
+		return self.__dbpool.runQuery("UPDATE users SET ttl = ?, level = ? WHERE username = ?", (ttl, new_level, user, ))
+
+	def updateUserTime(self, user, amount):
+		return self.__dbpool.runQuery("UPDATE users SET ttl = ttl + ? WHERE username = ?", (amount, user,))
+
+	def updateAllUsersTime(self, amount):
+		return self.__dbpool.runQuery("UPDATE users SET ttl = ttl + ?", (amount,))
+
+	def register_user(self, reg_username, reg_password, reg_char_class):
+		query = 'INSERT INTO `users` (id,username,password,level,ttl,char_class,hostname,online) VALUES (NULL,?,?,1,?,?,NULL,1)'
+		return self.__dbpool.runQuery(query, (reg_username, reg_password, min_time, reg_char_class))
 
 
 class Bot(irc.IRCClient):
