@@ -19,7 +19,7 @@ import time, sys
 import ConfigParser
 
 timespan = 10.0
-min_time = 5
+min_time = 30
 penalty_constant = 1.1
 is_started = 0
 
