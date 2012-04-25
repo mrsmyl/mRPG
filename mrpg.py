@@ -165,23 +165,18 @@ class Bot(irc.IRCClient):
         self.nickservIdentify()
 
     def joined(self, channel):
-        """This will get called when the bot joins the channel."""
         self.mrpg.start()
 
     def privmsg(self, user, channel, msg):
-        """This will get called when the bot receives a message."""
         user = user.split('!', 1)[0]
 
         # Check to see if they're sending me a private message
         if channel == self.nickname:
-            # msg_out = "It isn't nice to whisper!  Play nice with the group."
-            #self.notice(user, msg_out)
-            #self.msg(self.factory.channel, msg)
             if msg.lower() == "register":
                 self.notice(user, "To register: /msg mBot register <char name> <password>  <char class>")
             else:
                 msg_split = msg.split(' ')
-                #ASOLUTELY NO ERROR CORRECTION YET!!
+                #TODO - Issue #2 - ASOLUTELY NO ERROR CORRECTION YET!!
                 if msg_split[0] == "register":
                     reg_username = msg_split[1]
                     reg_password = msg_split[2]
@@ -216,7 +211,7 @@ class Bot(irc.IRCClient):
         new_nick = params[0]
         self.mrpg.performPenalty(new_nick, "Nickname change")
 
-        # TODO Issue #3 - Track user nickname change
+        # TODO Issue #4 - Track user nickname change
 
     def nickservRegister(self):
         self.msg("nickserv", "register " + self.factory.nickserv_password + " " + self.factory.nickserv_email)
