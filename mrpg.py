@@ -172,20 +172,63 @@ class Bot(irc.IRCClient):
 
         # Check to see if they're sending me a private message
         if channel == self.nickname:
-            if msg.lower() == "register":
-                self.notice(user, "To register: /msg mBot register <char name> <password>  <char class>")
-            else:
-                msg_split = msg.split(' ')
-                #TODO - Issue #2 - ASOLUTELY NO ERROR CORRECTION YET!!
-                if msg_split[0] == "register":
-                    reg_username = msg_split[1]
-                    reg_password = msg_split[2]
-                    reg_char_class = msg_split[3::1]
-                    reg_char_class = ' '.join(reg_char_class)
-                    self.db = DBPool('mrpg.db')
-                    self.db.register_user(reg_username,reg_password,reg_char_class)
-                    self.db.shutdown("")
-                    self.notice(user, "Created new character " + reg_username)
+
+		msg_split = msg.split(' ')
+		msg_split[0] = msg_split[0].lower()
+		lenow = len(msg_split)
+
+		if (lenow == 1):
+		        options = {
+                		'register' : 'To register: /msg mBot register <char name> <password> <char class>',
+	                	'login': 'To login: /msg IdleBot REGISTER <char name> <password> <char class>',
+	        	        'newpass': 'To change your password: /msg IdleBot NEWPASS <new password>',
+        	        	'delete': 'To delete your account: /msg IdleBot REMOVEME',
+	        	        'active': 'To see if you are currently logged in: /msg IdleBot active',
+        	        	'help': 'help command not implemented yet' #TODO Issue #2
+		        }
+
+		        if (options.has_key(msg_split[0])):
+        		        self.msg(user,  options[msg_split[0]])
+		        else:
+        		        self.msg(user, "Command not found. Try the help command.")
+		else:
+		        def doregister():
+		                if (lenow >= 4):
+                		        #TODO Issue #2 	- Create encrypted passwords
+					#		- add hostname field
+	                	        reg_username = msg_split[1]
+        	                	reg_password = msg_split[2]
+	                	        reg_char_class = msg_split[3::1]
+        	                	reg_char_class = ' '.join(reg_char_class)
+	        	                self.db = DBPool('mrpg.db')
+        	        	        self.db.register_user(reg_username,reg_password,reg_char_class)
+                	        	self.db.shutdown("")
+	                        	self.msg(user, "Created new character " + reg_username)
+		                else:
+        		                self.msg(user, "Not enough information was supplied.")
+		        def dologin():
+		                self.msg(user, "do login")
+		        def donewpass():
+                		self.msg(user, "do newpass")
+		        def dodelete():
+                		self.msg(user, "do delete")
+		        def doactive():
+                		self.msg(user, "do active")
+		        def dohelp():
+                		self.msg(user, 'help command not implemented yet') #TODO Issue #2
+		        options = {
+		                'register': doregister,
+		                'login': dologin,
+		                'newpass': donewpass,
+                		'delete': dodelete,
+		                'active': doactive,
+                		'help': dohelp,
+		        }
+		        if (options.has_key(msg_split[0])):
+		                options[msg_split[0]]()
+		        else:
+		                self.msg(user, "Command not found. Try the help command.")
+
         else:
             self.mrpg.performPenalty(user, "channel message")
 
@@ -267,29 +310,3 @@ if __name__ == '__main__':
 
     # run bot
     reactor.run()
-
-
-
-
-
-
-
-
-# These two definitions will be used later for passwords.
-# So ignore this for now
-
-#def set_password(self, raw_password):
-#    import random
-#    algo = 'sha1'
-#    salt = get_hexdigest(algo, str(random.random()), str(random.random()))[:5]
-#    hsh = get_hexdigest(algo, salt, raw_password)
-#    self.password = '%s$%s$%s' % (algo, salt, hsh)
-
-#def check_password(raw_password, enc_password):
-#    """
-#    Returns a boolean of whether the raw_password was correct. Handles
-#    encryption formats behind the scenes.
-#    """
-#    algo, salt, hsh = enc_password.split('$')
-#    return hsh == get_hexdigest(algo, salt, raw_password)
-
