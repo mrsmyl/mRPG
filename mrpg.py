@@ -179,11 +179,11 @@ class Bot(irc.IRCClient):
 
 		if (lenow == 1):
 		        options = {
-                		'register' : 'To register: /msg mBot register <char name> <password> <char class>',
-	                	'login': 'To login: /msg IdleBot REGISTER <char name> <password> <char class>',
-	        	        'newpass': 'To change your password: /msg IdleBot NEWPASS <new password>',
-        	        	'delete': 'To delete your account: /msg IdleBot REMOVEME',
-	        	        'active': 'To see if you are currently logged in: /msg IdleBot active',
+                		'register' : 'To register: /msg ' + botname + ' register <char name> <password> <char class>',
+	                	'login': 'To login: /msg ' + botname + ' REGISTER <char name> <password> <char class>',
+	        	        'newpass': 'To change your password: /msg ' + botname + ' NEWPASS <new password>',
+        	        	'delete': 'To delete your account: /msg ' + botname + ' REMOVEME',
+	        	        'active': 'To see if you are currently logged in: /msg ' + botname + ' active',
         	        	'help': 'help command not implemented yet' #TODO Issue #2
 		        }
 
@@ -301,6 +301,7 @@ if __name__ == '__main__':
 
     server = config.get('IRC', 'server')
     port = config.getint('IRC', 'port')
+    botname = config.get('IRC', 'nickname')
 
     # create factory protocol and application
     f = BotFactory()
