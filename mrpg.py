@@ -242,25 +242,26 @@ class Bot(irc.IRCClient):
         if "startup" in msg:
             self.mrpg.start()
 
-def action(self, user, channel, msg):
-    user = user.split('!', 1)[0]
-    self.mrpg.performPenalty(user, "Channel action")
+    def action(self, user, channel, msg):
+        user = user.split('!', 1)[0]
+        self.mrpg.performPenalty(user, "Channel action")
 
-# irc callbacks
+    # irc callbacks
 
-def irc_NICK(self, prefix, params):
-    """Called when an IRC user changes their nickname."""
-    old_nick = prefix.split('!')[0]
-    new_nick = params[0]
-    self.mrpg.performPenalty(new_nick, "Nickname change")
+    def irc_NICK(self, prefix, params):
+        """Called when an IRC user changes their nickname."""
+        old_nick = prefix.split('!')[0]
+        new_nick = params[0]
+        self.mrpg.performPenalty(new_nick, "Nickname change")
 
-    # TODO Issue #4 - Track user nickname change
+        # TODO Issue #4 - Track user nickname change
 
-def nickservRegister(self):
-    self.msg("nickserv", "register " + self.factory.nickserv_password + " " + self.factory.nickserv_email)
+    def nickservRegister(self):
+        self.msg("nickserv", "register " + self.factory.nickserv_password + " " + self.factory.nickserv_email)
 
-def nickservIdentify(self):
-    self.msg("nickserv", "identify " + self.factory.nickserv_password)
+    def nickservIdentify(self):
+        self.msg("nickserv", "identify " + self.factory.nickserv_password)
+
 class BotFactory(protocol.ClientFactory):
     """A factory for Bots.
 
