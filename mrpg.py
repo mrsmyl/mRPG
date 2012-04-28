@@ -178,89 +178,89 @@ class Bot(irc.IRCClient):
         lenow = len(msg_split)
 
         if (lenow == 1):
-                options = {
-                        'register' : 'To register: /msg ' + botname + ' register <char name> <password> <char class>',
-                        'login': 'To login: /msg ' + botname + ' REGISTER <char name> <password> <char class>',
-                        'newpass': 'To change your password: /msg ' + botname + ' NEWPASS <new password>',
-                        'delete': 'To delete your account: /msg ' + botname + ' REMOVEME',
-                        'active': 'To see if you are currently logged in: /msg ' + botname + ' active',
-                        'help': 'help command not implemented yet' #TODO Issue #2
-                }
+            options = {
+                'register' : 'To register: /msg ' + botname + ' register <char name> <password> <char class>',
+                'login': 'To login: /msg ' + botname + ' REGISTER <char name> <password> <char class>',
+                'newpass': 'To change your password: /msg ' + botname + ' NEWPASS <new password>',
+                'delete': 'To delete your account: /msg ' + botname + ' REMOVEME',
+                'active': 'To see if you are currently logged in: /msg ' + botname + ' active',
+                'help': 'help command not implemented yet' #TODO Issue #2
+            }
 
-                if (options.has_key(msg_split[0])):
-                        self.msg(user,  options[msg_split[0]])
-                else:
-                        self.msg(user, "Command not found. Try the help command.")
+            if (options.has_key(msg_split[0])):
+                self.msg(user,  options[msg_split[0]])
+            else:
+                self.msg(user, "Command not found. Try the help command.")
         else:
-                def doregister():
-                        if (lenow >= 4):
-                                #TODO Issue #2     - Create encrypted passwords
-                    #        - add hostname field
-                                reg_username = msg_split[1]
-                                reg_password = msg_split[2]
-                                reg_char_class = msg_split[3::1]
-                                reg_char_class = ' '.join(reg_char_class)
-                                self.db = DBPool('mrpg.db')
-                                self.db.register_user(reg_username,reg_password,reg_char_class)
-                                self.db.shutdown("")
-                                self.msg(user, "Created new character " + reg_username)
-                        else:
-                                self.msg(user, "Not enough information was supplied.")
-                def dologin():
-                        self.msg(user, "do login")
-                def donewpass():
-                        self.msg(user, "do newpass")
-                def dodelete():
-                        self.msg(user, "do delete")
-                def doactive():
-                        self.msg(user, "do active")
-                def dohelp():
-                        self.msg(user, 'help command not implemented yet') #TODO Issue #2
-                options = {
-                        'register': doregister,
-                        'login': dologin,
-                        'newpass': donewpass,
-                        'delete': dodelete,
-                        'active': doactive,
-                        'help': dohelp,
-                }
-                if (options.has_key(msg_split[0])):
-                        options[msg_split[0]]()
+            def doregister():
+                if (lenow >= 4):
+                    #TODO Issue #2     - Create encrypted passwords
+                    # - add hostname field
+                    reg_username = msg_split[1]
+                    reg_password = msg_split[2]
+                    reg_char_class = msg_split[3::1]
+                    reg_char_class = ' '.join(reg_char_class)
+                    self.db = DBPool('mrpg.db')
+                    self.db.register_user(reg_username,reg_password,reg_char_class)
+                    self.db.shutdown("")
+                    self.msg(user, "Created new character " + reg_username)
                 else:
-                        self.msg(user, "Command not found. Try the help command.")
+                    self.msg(user, "Not enough information was supplied.")
+            def dologin():
+                self.msg(user, "do login")
+            def donewpass():
+                self.msg(user, "do newpass")
+            def dodelete():
+                self.msg(user, "do delete")
+            def doactive():
+                self.msg(user, "do active")
+            def dohelp():
+                self.msg(user, 'help command not implemented yet') #TODO Issue #2
+            options = {
+                'register': doregister,
+                'login': dologin,
+                'newpass': donewpass,
+                'delete': dodelete,
+                'active': doactive,
+                'help': dohelp,
+                }
+            if (options.has_key(msg_split[0])):
+                options[msg_split[0]]()
+            else:
+                self.msg(user, "Command not found. Try the help command.")
 
         else:
-            self.mrpg.performPenalty(user, "channel message")
+        self.mrpg.performPenalty(user, "channel message")
 
-        # Otherwise check to see if it is a message directed at me
-        if msg.startswith(self.nickname + ":"):
-            msg_out = "%s: I am a log bot" % user
-            self.msg(channel, msg_out)
-            self.msg(channel, msg)
-            if "shutdown" in msg:
-                self.mrpg.stop()
-            if "startup" in msg:
-                self.mrpg.start()
+    # Otherwise check to see if it is a message directed at me
+    if msg.startswith(self.nickname + ":"):
+        msg_out = "%s: I am a log bot" % user
+        self.msg(channel, msg_out)
+        self.msg(channel, msg)
+        if "shutdown" in msg:
+            self.mrpg.stop()
+        if "startup" in msg:
+            self.mrpg.start()
 
-    def action(self, user, channel, msg):
-        user = user.split('!', 1)[0]
-        self.mrpg.performPenalty(user, "Channel action")
+def action(self, user, channel, msg):
+    user = user.split('!', 1)[0]
+    self.mrpg.performPenalty(user, "Channel action")
 
-    # irc callbacks
+# irc callbacks
 
-    def irc_NICK(self, prefix, params):
-        """Called when an IRC user changes their nickname."""
-        old_nick = prefix.split('!')[0]
-        new_nick = params[0]
-        self.mrpg.performPenalty(new_nick, "Nickname change")
+def irc_NICK(self, prefix, params):
+    """Called when an IRC user changes their nickname."""
+    old_nick = prefix.split('!')[0]
+    new_nick = params[0]
+    self.mrpg.performPenalty(new_nick, "Nickname change")
 
-        # TODO Issue #4 - Track user nickname change
+    # TODO Issue #4 - Track user nickname change
 
-    def nickservRegister(self):
-        self.msg("nickserv", "register " + self.factory.nickserv_password + " " + self.factory.nickserv_email)
+def nickservRegister(self):
+    self.msg("nickserv", "register " + self.factory.nickserv_password + " " + self.factory.nickserv_email)
 
-    def nickservIdentify(self):
-        self.msg("nickserv", "identify " + self.factory.nickserv_password)
+def nickservIdentify(self):
+    self.msg("nickserv", "identify " + self.factory.nickserv_password)
 class BotFactory(protocol.ClientFactory):
     """A factory for Bots.
 
