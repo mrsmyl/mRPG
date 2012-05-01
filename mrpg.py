@@ -14,7 +14,6 @@ from twisted.python import log
 from twisted.enterprise import adbapi
 import time, sys
 import ConfigParser
-import bullshit
 
 
 # Global Variables
