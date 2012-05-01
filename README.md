@@ -1,12 +1,12 @@
-mRPG 1.0
+mRPG
 ========
 A reinterpretation of the IdleRPG
 
 Disclaimer
 --------
-This project is in the beginning stages.
+This project is not yet feature complete.
 
-Authors
+Contributors
 --------
 * [NeWtoz](https://github.com/newtoz)
 * [Richard](https://github.com/richard4339)
