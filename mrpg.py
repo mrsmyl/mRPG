@@ -31,7 +31,7 @@ class mrpg:
         self.db.mrpg = self
 
     def start(self):
-        self.msg("Starting mrpg")
+        self.msg("Starting mRPG")
         self.msg("Please standby")
 
         # Start the reactor task that repeatedly loops through actions
@@ -41,7 +41,7 @@ class mrpg:
         self.msg("Initialization complete")
 
     def stop(self):
-        self.msg("I think my loop needs to stop")
+        # self.msg("I think my loop needs to stop")
         self.l.stop()
         global is_started
         is_started = 0
