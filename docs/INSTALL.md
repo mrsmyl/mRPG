@@ -6,3 +6,4 @@ Licensed under the Creative Commons BY-NC-SA license.
 Software needed for mRPG
 --------
 * Twisted (http://twistedmatrix.com)
+* passlib (https://code.google.com/p/passlib/)
