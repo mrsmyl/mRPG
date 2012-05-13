@@ -18,6 +18,9 @@ from passlib.hash import sha512_crypt  as sc
 
 # Global Variables
 is_started = 0
+#timespan = 10.0 #Time in seconds that the bot will cycle 
+#min_time = 30 #Minimum time in seconds that you can level
+#penalty_constant = 1.1 #Some penalty constant that richard made up
 
 class mrpg:
     def __init__(self, parent):
@@ -320,9 +323,9 @@ if __name__ == '__main__':
     server = config.get('IRC', 'server')
     port = config.getint('IRC', 'port')
     botname = config.get('IRC', 'nickname')
-    timespan = config.get('BOT', 'timespan')
-    min_time = config.get('BOT', 'min_time')
-    penalty_constant = config.get('BOT', 'penalty_constant')
+    timespan = config.getfloat('BOT', 'timespan')
+    min_time = config.getint('BOT', 'min_time')
+    penalty_constant = config.getfloat('BOT', 'penalty_constant')
     # create factory protocol and application
     f = BotFactory()
 
