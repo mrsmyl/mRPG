@@ -17,9 +17,6 @@ import ConfigParser
 from passlib.hash import sha512_crypt  as sc
 
 # Global Variables
-timespan = 10.0 # TODO This should be in the config file
-min_time = 30 # TODO This should be in the config file
-penalty_constant = 1.1 # TODO This should be in the config file
 is_started = 0
 
 class mrpg:
@@ -323,7 +320,9 @@ if __name__ == '__main__':
     server = config.get('IRC', 'server')
     port = config.getint('IRC', 'port')
     botname = config.get('IRC', 'nickname')
-
+    timespan = config.get('BOT', 'timespan')
+    min_time = config.get('BOT', 'min_time')
+    penalty_constant = config.get('BOT', 'penalty_constant')
     # create factory protocol and application
     f = BotFactory()
 
