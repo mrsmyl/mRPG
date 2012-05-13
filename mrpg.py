@@ -18,9 +18,6 @@ from passlib.hash import sha512_crypt  as sc
 
 # Global Variables
 is_started = 0
-#timespan = 10.0 #Time in seconds that the bot will cycle 
-#min_time = 30 #Minimum time in seconds that you can level
-#penalty_constant = 1.1 #Some penalty constant that richard made up
 
 class mrpg:
     def __init__(self, parent):
