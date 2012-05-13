@@ -28,14 +28,17 @@ class mrpg:
         self.db.mrpg = self
 
     def start(self):
-        self.msg("Starting mrpg")
+        self.msg("Starting mRPG")
+        print "Starting mRPG"
         self.msg("Please standby")
+        print "Please standby"
 
         # Start the reactor task that repeatedly loops through actions
         self.l.start(timespan)
         global is_started
         is_started = 1
         self.msg("Initialization complete")
+        print "Initialization complete"
 
     def stop(self):
         self.msg("I think my loop needs to stop")
@@ -113,12 +116,14 @@ class DBPool:
             self.levelUpUser(user, level)
             print user + " has reached level " +str(new_level)
 
-
     def getResults(self, output):
         return output
-
+    
     def executeQuery(self, query, args):
-        return self.__dbpool.runQuery(query, args)
+        if (type(args) is tuple):
+            return self.__dbpool.runQuery(query, (args))
+        else:
+            return self.__dbpool.runQuery(query, [args])
 
     def levelUpUser(self, user, level):
         new_level = level + 1
@@ -138,9 +143,17 @@ class DBPool:
         query = 'INSERT INTO `users` (id,username,password,level,ttl,char_class,hostname,online) VALUES (NULL,?,?,1,?,?,NULL,1)'
         return self.__dbpool.runQuery(query, (reg_username, reg_password, min_time, reg_char_class))
 
-    def identify_user(self, ident_username):
+    def get_password(self, username):
         query = 'SELECT password from users where username = ?'
-        return self.__dbpool.runQuery(query, [ident_username])
+        return self.__dbpool.runQuery(query, [username])
+
+    def is_user_online(self, username):
+        query = 'SELECT online from users where username = ?'
+        return self.__dbpool.runQuery(query, [username])
+        
+    def does_user_exist(self, username):
+        query = 'SELECT count(*) from users WHERE username = ?'
+        return self.__dbpool.runQuery(query, [username])
 
 class Bot(irc.IRCClient):
     """A logging IRC bot."""
@@ -179,60 +192,175 @@ class Bot(irc.IRCClient):
             if (lenow == 1):
                 options = {
                     'register' : 'To register: /msg ' + botname + ' register <char name> <password> <char class>',
-                    'login': 'To login: /msg ' + botname + ' login <password>',
-                    'logout': 'To logout: /msg ' + botname + 'logout',
-                    'newpass': 'To change your password: /msg ' + botname + ' NEWPASS <new password>',
-                    'delete': 'To delete your account: /msg ' + botname + ' REMOVEME',
-                    'active': 'To see if you are currently logged in: /msg ' + botname + ' active',
-                    'help': 'help command not implemented yet' #TODO Issue #2
+                    'login': 'To login: /msg ' + botname + ' login <char name> <password>',
+                    'logout': 'To logout: /msg ' + botname + ' logout <char name> <password>',
+                    'newpass': 'To change your password: /msg ' + botname + ' NEWPASS <char name> <oldpass> <new password>',
+                    'delete': 'To delete your account: /msg ' + botname + ' DELETE <char name> <password>',
+                    'active': 'To see if you are currently logged in: /msg ' + botname + ' active <char name>',
+                    'help': 'Available commands: REGISTER, LOGIN, LOGOUT, NEWPASS, DELETE, ACTIVE, HELP'
                 }
                 if (options.has_key(msg_split[0])):
                     self.msg(user,  options[msg_split[0]])
                 else:
                     self.msg(user, "Command not found. Try the help command.")
             else:
+                @defer.inlineCallbacks
                 def doregister():
                     if (lenow >= 4):
-                        #TODO Issue #2 	- Create encrypted passwords
-                        #		- add hostname field
+                        #TODO Issue #2 - add hostname field
                         reg_username = msg_split[1]
                         reg_password = msg_split[2]
-                        hash = sc.encrypt(reg_password)
-                        hash
-                        '$6$rounds=36122$kzMjVFTjgSVuPoS.$zx2RoZ2TYRHoKn71Y60MFmyqNPxbNnTZdwYD8y2atgoRIp923WJSbcbQc6Af3osdW96MRfwb5Hk7FymOM6D7J1'
-                        reg_char_class = msg_split[3::1]
-                        reg_char_class = ' '.join(reg_char_class)
                         self.db = DBPool('mrpg.db')
-                        self.db.register_user(reg_username,hash,reg_char_class)
+                        user_exists = yield self.db.does_user_exist(reg_username)
                         self.db.shutdown("")
-                        self.msg(user, "Created new character " + reg_username)
+                        if(user_exists[0][0] == 1):
+                            self.msg(user, "There is already a character with that username.")
+                        else:
+                            hash = sc.encrypt(reg_password)
+                            hash
+                            '$6$rounds=36122$kzMjVFTjgSVuPoS.$zx2RoZ2TYRHoKn71Y60MFmyqNPxbNnTZdwYD8y2atgoRIp923WJSbcbQc6Af3osdW96MRfwb5Hk7FymOM6D7J1'
+                            reg_char_class = msg_split[3::1]
+                            reg_char_class = ' '.join(reg_char_class)
+                            self.db = DBPool('mrpg.db')
+                            self.db.register_user(reg_username,hash,reg_char_class)
+                            self.db.shutdown("")
+                            self.msg(user, "Created new character " + reg_username)
                     else:
                         self.msg(user, "Not enough information was supplied.")
                 @defer.inlineCallbacks
                 def dologin():
-                    ident_username = msg_split[1]
-                    ident_password = msg_split[2]
-                    print ident_username
-                    print ident_password
-                    self.db = DBPool('mrpg.db')
-                    temppass = yield self.db.identify_user(ident_username)
-                    passhash = temppass[0][0]
-                    self.db.shutdown("")
-                    if (sc.verify(ident_password, passhash)):
-                        self.msg(user, "You are now logged in.")
-                        #TODO Actually make this login..
+                    if (lenow >= 3):
+                        login_username = msg_split[1]
+                        login_password = msg_split[2]
+                        self.db = DBPool('mrpg.db')
+                        user_exists = yield self.db.does_user_exist(login_username)
+                        self.db.shutdown("")
+                        if(user_exists[0][0] == 0):
+                            self.msg(user, "There is not a character by that name.")
+                        else:
+                            self.db = DBPool('mrpg.db')
+                            is_online = yield self.db.is_user_online(login_username)
+                            self.db = DBPool('mrpg.db')
+                            if (is_online[0][0] == 0):
+                                self.db = DBPool('mrpg.db')
+                                temppass = yield self.db.get_password(login_username)
+                                passhash = temppass[0][0]
+                                self.db.shutdown("")
+                                if (sc.verify(login_password, passhash)):
+                                    self.db = DBPool('mrpg.db')
+                                    self.db.executeQuery("UPDATE users SET online = 1 WHERE username = ?",(login_username))
+                                    self.db.shutdown("")
+                                    self.msg(user, "You are now logged in.")
+                                else:
+                                    self.msg(user, "Password incorrect.")
+                            else:
+                                self.msg(user, "You are already logged in")
                     else:
-                        self.msg(user, "Password incorrect.")
+                        self.msg(user, "Not enough information was supplied.")
+                @defer.inlineCallbacks
                 def dologout():
-                    self.msg(user, "do logout")
+                    if (lenow >= 3):
+                        logout_username = msg_split[1]
+                        logout_password = msg_split[2]
+                        self.db = DBPool('mrpg.db')
+                        user_exists = yield self.db.does_user_exist(logout_username)
+                        self.db.shutdown("")
+                        if(user_exists[0][0] == 0):
+                            self.msg(user, "There is not a character by that name.")
+                        else:
+                            self.db = DBPool('mrpg.db')
+                            is_online = yield self.db.is_user_online(logout_username)
+                            self.db.shutdown("")
+                            if(is_online[0][0]==1):
+                                self.db = DBPool('mrpg.db')
+                                passhash = yield self.db.get_password(logout_username)
+                                passhash = passhash[0][0]
+                                self.db.shutdown("")
+                                if (sc.verify(logout_password, passhash)):
+                                    self.db = DBPool('mrpg.db')
+                                    self.db.executeQuery("UPDATE users SET online = 0 WHERE username = ?",logout_username)
+                                    self.db.shutdown("")
+                                    self.msg(user, "You are now logged out.")
+                                else:
+                                    self.msg(user, "Password incorrect.")
+                            else:
+                                self.msg(user, "You are not logged in")
+                    else:
+                        self.msg(user, "Not enough information was supplied.")
+                
+                @defer.inlineCallbacks
                 def donewpass():
-                    self.msg(user, "do newpass")
+                    if (lenow >= 4):
+                        newpass_username = msg_split[1]
+                        newpass_password = msg_split[2]
+                        newpass_new_password = msg_split[3]
+                        
+                        self.db = DBPool('mrpg.db')
+                        user_exists = yield self.db.does_user_exist(newpass_username)
+                        self.db.shutdown("")
+                        if(user_exists[0][0] == 0):
+                            self.msg(user, "There is not a character by that name.")
+                        else:
+                            self.db = DBPool('mrpg.db')
+                            passhash = yield self.db.get_password(newpass_username)
+                            passhash = passhash[0][0]
+                            self.db.shutdown("")
+                            if(sc.verify(newpass_password, passhash)):
+                                hash = sc.encrypt(newpass_new_password)
+                                hash
+                                '$6$rounds=36122$kzMjVFTjgSVuPoS.$zx2RoZ2TYRHoKn71Y60MFmyqNPxbNnTZdwYD8y2atgoRIp923WJSbcbQc6Af3osdW96MRfwb5Hk7FymOM6D7J1'
+                                self.db = DBPool('mrpg.db')
+                                self.db.executeQuery("UPDATE users SET password = ? WHERE username = ?",(hash, newpass_username))
+                                self.db.shutdown("")
+                                self.msg(user, "You have changed your password.")
+                            else:
+                                self.msg(user, "Password incorrect.")
+                    else:
+                        self.msg(user, "Not enough information was supplied.")
+                
+                @defer.inlineCallbacks
                 def dodelete():
-                    self.msg(user, "do delete")
+                    if (lenow >= 3):
+                        delete_username = msg_split[1]
+                        delete_password = msg_split[2]
+                        
+                        self.db = DBPool('mrpg.db')
+                        user_exists = yield self.db.does_user_exist(delete_username)
+                        self.db.shutdown("")
+                        if(user_exists[0][0] == 0):
+                            self.msg(user, "There is not a character by that name.")
+                        else:
+                            self.db = DBPool('mrpg.db')
+                            passhash = yield self.db.get_password(delete_username)
+                            passhash = passhash[0][0]
+                            self.db.shutdown("")
+                            if (sc.verify(delete_password, passhash)):
+                                self.db = DBPool('mrpg.db')
+                                self.db.executeQuery("DELETE FROM users WHERE username = ?",delete_username)
+                                self.db.shutdown("")
+                                self.msg(user, delete_username + " has been deleted.")
+                            else:
+                                self.msg(user, "Password incorrect.")
+                    else:
+                        self.msg(user, "Not enough information was supplied.")
+                        
+                @defer.inlineCallbacks
                 def doactive():
-                    self.msg(user, "do active")
+                    active_username = msg_split[1]
+                    self.db = DBPool('mrpg.db')
+                    user_exists = yield self.db.does_user_exist(active_username)
+                    if(user_exists[0][0] == 0):
+                        self.msg(user, "There is not a character by that name.")
+                    else:
+                        self.db = DBPool('mrpg.db')
+                        user_online = yield self.db.executeQuery("SELECT online FROM users WHERE username = ?",active_username)
+                        self.db.shutdown("")
+                        if (user_online[0][0] == 0):
+                            self.msg(user, active_username + " is not online.")
+                        else:
+                            self.msg(user, active_username + " is online.")
                 def dohelp():
-                    self.msg(user, 'help command not implemented yet') #TODO Issue #2
+                    self.msg(user, 'Available commands: REGISTER, LOGIN, LOGOUT, NEWPASS, DELETE, ACTIVE, HELP')
                 options = {
                     'register': doregister,
                     'login': dologin,
@@ -240,7 +368,7 @@ class Bot(irc.IRCClient):
                     'newpass': donewpass,
                     'delete': dodelete,
                     'active': doactive,
-                    'help': dohelp,
+                    'help': dohelp
                 }
                 if (options.has_key(msg_split[0])):
                     options[msg_split[0]]()
