@@ -50,11 +50,15 @@ class mrpg:
     def msg(self, msg):
         self.parent.msg(self.channel, msg)
 
+    @defer.inlineCallbacks
     def performPenalty(self, user, reason):
         if is_started == 1:
-            self.msg(user + " has earned a penalty for: " + reason)
-            self.db.updateUserTimeMultiplier(user, penalty_constant)
-            self.db.getSingleUser(user)
+            is_online = yield self.db.is_user_online(user)
+            if is_online:
+                if is_online[0][0] == 1:
+                    self.msg(user + " has earned a penalty for: " + reason)
+                    self.db.updateUserTimeMultiplier(user, penalty_constant)
+                    self.db.getSingleUser(user)
 
     def writetofile(self, message):
         with open('output','a') as f:
