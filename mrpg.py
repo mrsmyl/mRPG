@@ -180,7 +180,12 @@ class DBPool:
         return self.__dbpool.runQuery(query, (old_username, new_username, hostname, old_username))
     
 class Bot(irc.IRCClient):
-    """A logging IRC bot."""
+    def privateMessage(self, user, msg):
+        if self.factory.use_private_message == "Y":
+            self.msg(user, msg)
+        else:
+            self.notice(user, msg)
+
 
     def _get_nickname(self):
         return self.factory.nickname
@@ -229,9 +234,9 @@ class Bot(irc.IRCClient):
                     'help': 'Available commands: REGISTER, LOGIN, LOGOUT, NEWPASS, DELETE, ACTIVE, HELP'
                 }
                 if (options.has_key(msg_split[0])):
-                    self.msg(user,  options[msg_split[0]])
+                    self.privateMessage(user,  options[msg_split[0]])
                 else:
-                    self.msg(user, "Command not found. Try the help command.")
+                    self.privateMessage(user, "Command not found. Try the help command.")
             else:
                 @defer.inlineCallbacks
                 def doregister():
@@ -245,7 +250,7 @@ class Bot(irc.IRCClient):
                         char_exists = yield self.db.does_char_name_exist(reg_char_name)
                         self.db.shutdown("")
                         if(char_exists[0][0] == 1):
-                            self.msg(user, "There is already a character with that name.")
+                            self.privateMessage(user, "There is already a character with that name.")
                         else:
                             hash = sc.encrypt(reg_password)
                             hash
@@ -253,10 +258,10 @@ class Bot(irc.IRCClient):
                             self.db = DBPool('mrpg.db')
                             self.db.register_char(user, reg_char_name, hash, reg_char_class, hostname)
                             self.db.shutdown("")
-                            self.msg(user, "Created new character " + reg_char_name)
+                            self.privateMessage(user, "Created new character " + reg_char_name)
                             self.mrpg.msg("Welcome new character: " + reg_char_name + ", the " + reg_char_class)
                     else:
-                        self.msg(user, "Not enough information was supplied.")
+                        self.privateMessage(user, "Not enough information was supplied.")
                 @defer.inlineCallbacks
                 def dologin():
                     if (lenow >= 3):
@@ -266,7 +271,7 @@ class Bot(irc.IRCClient):
                         char_exists = yield self.db.does_char_name_exist(login_char_name)
                         self.db.shutdown("")
                         if(char_exists[0][0] == 0):
-                            self.msg(user, "There is not a character by that name.")
+                            self.privateMessage(user, "There is not a character by that name.")
                         else:
                             self.db = DBPool('mrpg.db')
                             is_online = yield self.db.is_char_online(login_char_name)
@@ -280,13 +285,13 @@ class Bot(irc.IRCClient):
                                     self.db = DBPool('mrpg.db')
                                     self.db.executeQuery("UPDATE users SET online = 1, hostname = ? WHERE char_name = ?",(hostname,login_char_name))
                                     self.db.shutdown("")
-                                    self.msg(user, "You are now logged in.")
+                                    self.privateMessage(user, "You are now logged in.")
                                 else:
-                                    self.msg(user, "Password incorrect.")
+                                    self.privateMessage(user, "Password incorrect.")
                             else:
-                                self.msg(user, "You are already logged in")
+                                self.privateMessage(user, "You are already logged in")
                     else:
-                        self.msg(user, "Not enough information was supplied.")
+                        self.privateMessage(user, "Not enough information was supplied.")
            
                 @defer.inlineCallbacks
                 def dologout():
@@ -297,7 +302,7 @@ class Bot(irc.IRCClient):
                         char_exists = yield self.db.does_char_name_exist(logout_char_name)
                         self.db.shutdown("")
                         if(char_exists[0][0] == 0):
-                            self.msg(user, "There is not a character by that name.")
+                            self.privateMessage(user, "There is not a character by that name.")
                         else:
                             self.db = DBPool('mrpg.db')
                             is_online = yield self.db.is_char_online(logout_char_name)
@@ -311,13 +316,13 @@ class Bot(irc.IRCClient):
                                     self.db = DBPool('mrpg.db')
                                     self.db.executeQuery("UPDATE users SET online = 0, hostname = ? WHERE char_name = ?",(hostname,logout_char_name))
                                     self.db.shutdown("")
-                                    self.msg(user, "You are now logged out.")
+                                    self.privateMessage(user, "You are now logged out.")
                                 else:
-                                    self.msg(user, "Password incorrect.")
+                                    self.privateMessage(user, "Password incorrect.")
                             else:
-                                self.msg(user, "You are not logged in")
+                                self.privateMessage(user, "You are not logged in")
                     else:
-                        self.msg(user, "Not enough information was supplied.")
+                        self.privateMessage(user, "Not enough information was supplied.")
               
                 @defer.inlineCallbacks
                 def donewpass():
@@ -330,7 +335,7 @@ class Bot(irc.IRCClient):
                         char_exists = yield self.db.does_char_name_exist(newpass_char_name)
                         self.db.shutdown("")
                         if(char_exists[0][0] == 0):
-                            self.msg(user, "There is not a character by that name.")
+                            self.privateMessage(user, "There is not a character by that name.")
                         else:
                             self.db = DBPool('mrpg.db')
                             passhash = yield self.db.get_password(newpass_char_name)
@@ -343,11 +348,11 @@ class Bot(irc.IRCClient):
                                 self.db = DBPool('mrpg.db')
                                 self.db.executeQuery("UPDATE users SET password = ? WHERE char_name = ?",(hash, newpass_char_name))
                                 self.db.shutdown("")
-                                self.msg(user, "You have changed your password.")
+                                self.privateMessage(user, "You have changed your password.")
                             else:
-                                self.msg(user, "Password incorrect.")
+                                self.privateMessage(user, "Password incorrect.")
                     else:
-                        self.msg(user, "Not enough information was supplied.")
+                        self.privateMessage(user, "Not enough information was supplied.")
                 
                 @defer.inlineCallbacks
                 def dodelete():
@@ -359,7 +364,7 @@ class Bot(irc.IRCClient):
                         char_exists = yield self.db.does_char_name_exist(delete_char_name)
                         self.db.shutdown("")
                         if(char_exists[0][0] == 0):
-                            self.msg(user, "There is not a character by that name.")
+                            self.privateMessage(user, "There is not a character by that name.")
                         else:
                             self.db = DBPool('mrpg.db')
                             passhash = yield self.db.get_password(delete_char_name)
@@ -369,11 +374,11 @@ class Bot(irc.IRCClient):
                                 self.db = DBPool('mrpg.db')
                                 self.db.executeQuery("DELETE FROM users WHERE char_name = ?",delete_char_name)
                                 self.db.shutdown("")
-                                self.msg(user, delete_char_name + " has been deleted.")
+                                self.privateMessage(user, delete_char_name + " has been deleted.")
                             else:
-                                self.msg(user, "Password incorrect.")
+                                self.privateMessage(user, "Password incorrect.")
                     else:
-                        self.msg(user, "Not enough information was supplied.")
+                        self.privateMessage(user, "Not enough information was supplied.")
                         
                 @defer.inlineCallbacks
                 def doactive():
@@ -381,18 +386,18 @@ class Bot(irc.IRCClient):
                     self.db = DBPool('mrpg.db')
                     char_exists = yield self.db.does_char_name_exist(active_char_name)
                     if(char_exists[0][0] == 0):
-                        self.msg(user, "There is not a character by that name.")
+                        self.privateMessage(user, "There is not a character by that name.")
                     else:
                         self.db = DBPool('mrpg.db')
                         char_online = yield self.db.executeQuery("SELECT online FROM users WHERE char_name = ?",active_char_name)
                         self.db.shutdown("")
                         if (char_online[0][0] == 0):
-                            self.msg(user, active_char_name + " is not online.")
+                            self.privateMessage((user, active_char_name + " is not online.")
                         else:
-                            self.msg(user, active_char_name + " is online.")
+                            self.privateMessage((user, active_char_name + " is online.")
                 
                 def dohelp():
-                    self.msg(user, 'Available commands: REGISTER, LOGIN, LOGOUT, NEWPASS, DELETE, ACTIVE, HELP')
+                    self.privateMessage(user, 'Available commands: REGISTER, LOGIN, LOGOUT, NEWPASS, DELETE, ACTIVE, HELP')
                 options = {
                     'register': doregister,
                     'login': dologin,
@@ -405,7 +410,7 @@ class Bot(irc.IRCClient):
                 if (options.has_key(msg_split[0])):
                     options[msg_split[0]]()
                 else:
-                    self.msg(user, "Command not found. Try the help command.")
+                    self.privateMessage(user, "Command not found. Try the help command.")
         else:
             self.mrpg.performPenalty(user, "channel message")
 
@@ -530,6 +535,7 @@ class BotFactory(protocol.ClientFactory):
         self.nickname = config.get('IRC', 'nickname')
         self.nickserv_password = config.get('IRC', 'nickserv_password')
         self.nickserv_email = config.get('IRC', 'nickserv_email')
+        self.use_private_message = config.get('BOT', 'use_private_message')
 
     def buildProtocol(self, addr):
         p = Bot()
