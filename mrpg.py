@@ -2,6 +2,7 @@
 
 # mRPG
 # https://github.com/mozor/mRPG
+# Version 0.1
 #
 # Copyright 2012 Greg (NeWtoz@mozor.net) & Richard (richard@mozor.net);
 # This work is licensed under the Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
