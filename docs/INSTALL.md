@@ -5,5 +5,6 @@ Licensed under the Creative Commons BY-NC-SA license.
 
 Software needed for mRPG
 --------
+* Python (http://www.python.org)
 * Twisted (http://twistedmatrix.com)
 * passlib (https://code.google.com/p/passlib/)
