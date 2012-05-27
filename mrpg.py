@@ -172,8 +172,12 @@ class DBPool:
         return self.__dbpool.runQuery(query, (hostname,username))
         
     def make_user_offline(self, username, hostname):
-        query = 'UPDATE users SET online = 0, hostname = ? WHERE username = ?'
-        return self.__dbpool.runQuery(query, (hostname,username))
+        if hostname == "":
+            query = 'UPDATE users SET online = 0 WHERE username = ?'
+            return self.__dbpool.runQuery(query, [username])
+        else:
+            query = 'UPDATE users SET online = 0, hostname = ? WHERE username = ?'
+            return self.__dbpool.runQuery(query, (hostname,username))
     
     def get_prefix(self, username):
         query = 'SELECT hostname FROM users WHERE username = ?'
@@ -503,22 +507,20 @@ class Bot(irc.IRCClient):
             self.db.make_user_offline(username, hostname)
         self.db.shutdown("")
 
-    #This function is pretty useless for double checking without getting a hostname.
-    #Further work needs to be done
-    #
-    #@defer.inlineCallbacks   
+    @defer.inlineCallbacks
     def irc_KICK(self, prefix, params):
-        pass
         #kicker = prefix
-        #kickee = params[1]
+        kickee = params[1]
+
+        self.mrpg.performPenalty(kickee, "Kicked")
         #print kicker + " has kicked " + kickee
-        #self.db = DBPool('mrpg.db')
-        #is_online = yield self.db.is_user_online(kickee)
-        #if not is_online:
-            #pass
-        #elif(is_online[0][0] == 1):
-            #self.db.make_user_offline(kickee,hostname)
-        #self.db.shutdown("")
+        self.db = DBPool('mrpg.db')
+        is_online = yield self.db.is_user_online(kickee)
+        if not is_online:
+            pass
+        elif(is_online[0][0] == 1):
+            self.db.make_user_offline(kickee, "")
+        self.db.shutdown("")
          
     @defer.inlineCallbacks   
     def irc_NICK(self, prefix, params):
