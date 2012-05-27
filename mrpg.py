@@ -392,9 +392,9 @@ class Bot(irc.IRCClient):
                         char_online = yield self.db.executeQuery("SELECT online FROM users WHERE char_name = ?",active_char_name)
                         self.db.shutdown("")
                         if (char_online[0][0] == 0):
-                            self.privateMessage((user, active_char_name + " is not online.")
+                            self.privateMessage(user, active_char_name + " is not online.")
                         else:
-                            self.privateMessage((user, active_char_name + " is online.")
+                            self.privateMessage(user, active_char_name + " is online.")
                 
                 def dohelp():
                     self.privateMessage(user, 'Available commands: REGISTER, LOGIN, LOGOUT, NEWPASS, DELETE, ACTIVE, HELP')
