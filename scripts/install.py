@@ -30,7 +30,7 @@ else:
 
 	# Create Users Table
 	c.execute('''CREATE TABLE users
-	             (id INTEGER PRIMARY KEY, username TEXT, password TEXT, level NUMERIC, ttl NUMERIC, char_class TEXT, hostname TEXT, online INT, registration_date TEXT DEFAULT CURRENT_TIMESTAMP, last_login TEXT DEFAULT CURRENT_TIMESTAMP)''')
+	             (username TEXT PRIMARY KEY, char_name TEXT, password TEXT, char_class TEXT, hostname TEXT, level NUMERIC, ttl NUMERIC, online INT, registration_date TEXT DEFAULT CURRENT_TIMESTAMP, last_login TEXT DEFAULT CURRENT_TIMESTAMP)''')
 
 	conn.commit()
 	
