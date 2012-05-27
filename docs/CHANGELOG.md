@@ -3,6 +3,12 @@ ChangeLog for mRPG
 Copyright 2012 [Greg](https://github.com/newtoz) & [Richard](https://github.com/richard4339)  
 Licensed under the Creative Commons BY-NC-SA license. 
 
+0.2
+--------
+May 27, 2012
+
+* Events
+
 0.1
 --------
 May 27, 2012
