@@ -101,7 +101,7 @@ class DBPool:
 
     def showUser(self, output):
         for i in output:
-            message = str(i[1]) + " will reach the next level in " + str(i[4]) + " seconds."
+            message = str(i[1]) + " will reach the next level in " + str(i[6]) + " seconds."
             self.mrpg.msg(message)
             print message
 
