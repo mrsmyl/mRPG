@@ -101,7 +101,7 @@ class DBPool:
 
     def showUser(self, output):
         for i in output:
-            message = str(i[1]) + " will reach the next level in " + str(i[6te]) + " seconds."
+            message = str(i[1]) + " will reach the next level in " + str(i[6]) + " seconds."
             self.mrpg.msg(message)
             print message
 
@@ -509,6 +509,7 @@ class Bot(irc.IRCClient):
          
     @defer.inlineCallbacks   
     def irc_NICK(self, prefix, params):
+        # Update the database with the new username information
         old_username = prefix.split('!',1)[0]
         hostname = prefix.split('~',1)[1]
         new_username = params[0]
@@ -521,6 +522,9 @@ class Bot(irc.IRCClient):
         elif(is_online[0][0] == 1 and db_prefix[0][0] == hostname):
             self.db.update_username(old_username, new_username, hostname)
         self.db.shutdown("")
+
+        # Assign penalty
+        self.mrpg.performPenalty(new_username, "Changed nickname")
 
 class BotFactory(protocol.ClientFactory):
     """A factory for Bots.
