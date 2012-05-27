@@ -513,7 +513,6 @@ class Bot(irc.IRCClient):
         kickee = params[1]
 
         self.mrpg.performPenalty(kickee, "Kicked")
-        #print kicker + " has kicked " + kickee
         self.db = DBPool('mrpg.db')
         is_online = yield self.db.is_user_online(kickee)
         if not is_online:
