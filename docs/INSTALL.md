@@ -32,6 +32,7 @@ timespan = 10.0
 min_time = 30
 penalty_constant = 1.1
 use_private_message = 1
+event_randomness = 1
 ````
 
 Example Configuration Explanation
@@ -60,3 +61,5 @@ Example Configuration Explanation
 	Constant to multiply the current TTL by for penalty actions
 * **use_private_message** _integer [1/0]_  
 	1 means the bot will use a private message to a user for a private message, 0 means he will use a notice instead.
+* **event_randomness** _integer_  
+	The odds that you will get an event to trigger on each loop. 1 == lowest chance, 100 or higher == guaranteed. Entering 0 will effectively disable events altogether.
