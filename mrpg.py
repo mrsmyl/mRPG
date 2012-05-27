@@ -464,8 +464,15 @@ class Bot(irc.IRCClient):
         
     @defer.inlineCallbacks   
     def irc_PART(self, prefix, params):
+
+        # Update the database
+
         username = prefix.split('!',1)[0]
         hostname = prefix.split('~',1)[1]
+
+        # Assign the penalty
+        self.mrpg.performPenalty(username, "Signed Off")
+
         print "User: " + username + " with Host: " + hostname + " has left the channel"
         self.db = DBPool('mrpg.db')
         is_online = yield self.db.is_user_online(username)
@@ -478,8 +485,14 @@ class Bot(irc.IRCClient):
     
     @defer.inlineCallbacks   
     def irc_QUIT(self, prefix, params):
+
+        # Update the database
         username = prefix.split('!',1)[0]
         hostname = prefix.split('~',1)[1]
+
+        # Assign the penalty
+        self.mrpg.performPenalty(username, "Signed Off")
+
         print "User: " + username + " with Host: " + hostname + " has quit the server"
         self.db = DBPool('mrpg.db')
         is_online = yield self.db.is_user_online(username)
