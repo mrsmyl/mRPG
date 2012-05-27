@@ -14,7 +14,7 @@ from twisted.python import log
 from twisted.enterprise import adbapi
 import time, sys
 import ConfigParser
-from passlib.hash import sha512_crypt  as sc
+from passlib.hash import sha512_crypt as sc
 
 # Global Variables
 is_started = 0
@@ -52,11 +52,16 @@ class mrpg:
 
     def performPenalty(self, user, reason):
         if is_started == 1:
-            #commented out due to the spam it creates in IRC and just make it print to console
             self.msg(user + " has earned a penalty for: " + reason)
             self.db.updateUserTimeMultiplier(user, penalty_constant)
             self.db.getSingleUser(user)
 
+    def writetofile(self, message):
+        with open('output','a') as f:
+            message = str(message)
+            timestamp = time.strftime("[%b %d, %Y - %X] ")
+            f.write("%s%s\n" % (timestamp, message))
+        
     def rpg(self):
         self.db.updateAllUsersTime(timespan * -1)
 
@@ -65,7 +70,6 @@ class mrpg:
         # self.db.getAllUsers()
 
         # self.db.shutdown("")
-
 
 class DBPool:
     """
@@ -138,23 +142,43 @@ class DBPool:
 
     def updateAllUsersTime(self, amount):
         return self.__dbpool.runOperation("UPDATE users SET ttl = ttl + ? WHERE online = 1", (amount,))
+        
+    def register_char(self, user, reg_char_name, reg_password, reg_char_class, hostname):
+        query = 'INSERT INTO `users` (username,char_name,password,char_class,hostname,level,ttl,online) VALUES (?,?,?,?,?,1,?,1)'
+        return self.__dbpool.runQuery(query, (user, reg_char_name, reg_password, reg_char_class, hostname, min_time))
 
-    def register_user(self, reg_username, reg_password, reg_char_class):
-        query = 'INSERT INTO `users` (id,username,password,level,ttl,char_class,hostname,online) VALUES (NULL,?,?,1,?,?,NULL,1)'
-        return self.__dbpool.runQuery(query, (reg_username, reg_password, min_time, reg_char_class))
+    def get_password(self, char_name):
+        query = 'SELECT password from users where char_name = ?'
+        return self.__dbpool.runQuery(query, [char_name])
 
-    def get_password(self, username):
-        query = 'SELECT password from users where username = ?'
-        return self.__dbpool.runQuery(query, [username])
-
+    def is_char_online(self, char_name):
+        query = 'SELECT online from users where char_name = ?'
+        return self.__dbpool.runQuery(query, [char_name])
+        
     def is_user_online(self, username):
         query = 'SELECT online from users where username = ?'
         return self.__dbpool.runQuery(query, [username])
         
-    def does_user_exist(self, username):
-        query = 'SELECT count(*) from users WHERE username = ?'
+    def does_char_name_exist(self, reg_char_exist):
+        query = 'SELECT count(*) from users WHERE char_name = ?'
+        return self.__dbpool.runQuery(query, [reg_char_exist])
+        
+    def make_user_online(self, username, hostname):
+        query = 'UPDATE users SET online = 1, hostname = ? WHERE username = ?'
+        return self.__dbpool.runQuery(query, (hostname,username))
+        
+    def make_user_offline(self, username, hostname):
+        query = 'UPDATE users SET online = 0, hostname = ? WHERE username = ?'
+        return self.__dbpool.runQuery(query, (hostname,username))
+    
+    def get_prefix(self, username):
+        query = 'SELECT hostname FROM users WHERE username = ?'
         return self.__dbpool.runQuery(query, [username])
-
+    
+    def update_username(self, old_username, new_username, hostname):
+        query = 'UPDATE users SET username = replace(username, ?, ?), hostname = ? where username = ?'
+        return self.__dbpool.runQuery(query, (old_username, new_username, hostname, old_username))
+    
 class Bot(irc.IRCClient):
     """A logging IRC bot."""
 
@@ -177,11 +201,16 @@ class Bot(irc.IRCClient):
         """Called when bot has succesfully signed on to server."""
         self.join(self.factory.channel)
         self.nickservIdentify()
-
-    def joined(self, channel):
+        #see comment below on def join()
         self.mrpg.start()
 
+    #This was moved to signedOn so irc_JOIN works.
+    # not sure if this will cause problems or not.
+    #def joined(self, channel):
+        #self.mrpg.start()
+
     def privmsg(self, user, channel, msg):
+        hostname = user.split('~',1)[1]
         user = user.split('!', 1)[0]
 
         # Check to see if they're sending me a private message
@@ -207,48 +236,49 @@ class Bot(irc.IRCClient):
                 @defer.inlineCallbacks
                 def doregister():
                     if (lenow >= 4):
-                        #TODO Issue #2 - add hostname field
-                        reg_username = msg_split[1]
+                        reg_char_name = msg_split[1]
                         reg_password = msg_split[2]
+                        reg_char_class = msg_split[3::1]
+                        reg_char_class = ' '.join(reg_char_class)
+                        
                         self.db = DBPool('mrpg.db')
-                        user_exists = yield self.db.does_user_exist(reg_username)
+                        char_exists = yield self.db.does_char_name_exist(reg_char_name)
                         self.db.shutdown("")
-                        if(user_exists[0][0] == 1):
-                            self.msg(user, "There is already a character with that username.")
+                        if(char_exists[0][0] == 1):
+                            self.msg(user, "There is already a character with that name.")
                         else:
                             hash = sc.encrypt(reg_password)
                             hash
                             '$6$rounds=36122$kzMjVFTjgSVuPoS.$zx2RoZ2TYRHoKn71Y60MFmyqNPxbNnTZdwYD8y2atgoRIp923WJSbcbQc6Af3osdW96MRfwb5Hk7FymOM6D7J1'
-                            reg_char_class = msg_split[3::1]
-                            reg_char_class = ' '.join(reg_char_class)
                             self.db = DBPool('mrpg.db')
-                            self.db.register_user(reg_username,hash,reg_char_class)
+                            self.db.register_char(user, reg_char_name, hash, reg_char_class, hostname)
                             self.db.shutdown("")
-                            self.msg(user, "Created new character " + reg_username)
+                            self.msg(user, "Created new character " + reg_char_name)
+                            self.mrpg.msg("Welcome new character: " + reg_char_name + ", the " + reg_char_class)
                     else:
                         self.msg(user, "Not enough information was supplied.")
                 @defer.inlineCallbacks
                 def dologin():
                     if (lenow >= 3):
-                        login_username = msg_split[1]
+                        login_char_name = msg_split[1]
                         login_password = msg_split[2]
                         self.db = DBPool('mrpg.db')
-                        user_exists = yield self.db.does_user_exist(login_username)
+                        char_exists = yield self.db.does_char_name_exist(login_char_name)
                         self.db.shutdown("")
-                        if(user_exists[0][0] == 0):
+                        if(char_exists[0][0] == 0):
                             self.msg(user, "There is not a character by that name.")
                         else:
                             self.db = DBPool('mrpg.db')
-                            is_online = yield self.db.is_user_online(login_username)
+                            is_online = yield self.db.is_char_online(login_char_name)
                             self.db = DBPool('mrpg.db')
                             if (is_online[0][0] == 0):
                                 self.db = DBPool('mrpg.db')
-                                temppass = yield self.db.get_password(login_username)
+                                temppass = yield self.db.get_password(login_char_name)
                                 passhash = temppass[0][0]
                                 self.db.shutdown("")
                                 if (sc.verify(login_password, passhash)):
                                     self.db = DBPool('mrpg.db')
-                                    self.db.executeQuery("UPDATE users SET online = 1 WHERE username = ?",(login_username))
+                                    self.db.executeQuery("UPDATE users SET online = 1, hostname = ? WHERE char_name = ?",(hostname,login_char_name))
                                     self.db.shutdown("")
                                     self.msg(user, "You are now logged in.")
                                 else:
@@ -257,28 +287,29 @@ class Bot(irc.IRCClient):
                                 self.msg(user, "You are already logged in")
                     else:
                         self.msg(user, "Not enough information was supplied.")
+           
                 @defer.inlineCallbacks
                 def dologout():
                     if (lenow >= 3):
-                        logout_username = msg_split[1]
+                        logout_char_name = msg_split[1]
                         logout_password = msg_split[2]
                         self.db = DBPool('mrpg.db')
-                        user_exists = yield self.db.does_user_exist(logout_username)
+                        char_exists = yield self.db.does_char_name_exist(logout_char_name)
                         self.db.shutdown("")
-                        if(user_exists[0][0] == 0):
+                        if(char_exists[0][0] == 0):
                             self.msg(user, "There is not a character by that name.")
                         else:
                             self.db = DBPool('mrpg.db')
-                            is_online = yield self.db.is_user_online(logout_username)
+                            is_online = yield self.db.is_char_online(logout_char_name)
                             self.db.shutdown("")
                             if(is_online[0][0]==1):
                                 self.db = DBPool('mrpg.db')
-                                passhash = yield self.db.get_password(logout_username)
+                                passhash = yield self.db.get_password(logout_char_name)
                                 passhash = passhash[0][0]
                                 self.db.shutdown("")
                                 if (sc.verify(logout_password, passhash)):
                                     self.db = DBPool('mrpg.db')
-                                    self.db.executeQuery("UPDATE users SET online = 0 WHERE username = ?",logout_username)
+                                    self.db.executeQuery("UPDATE users SET online = 0, hostname = ? WHERE char_name = ?",(hostname,logout_char_name))
                                     self.db.shutdown("")
                                     self.msg(user, "You are now logged out.")
                                 else:
@@ -287,22 +318,22 @@ class Bot(irc.IRCClient):
                                 self.msg(user, "You are not logged in")
                     else:
                         self.msg(user, "Not enough information was supplied.")
-                
+              
                 @defer.inlineCallbacks
                 def donewpass():
                     if (lenow >= 4):
-                        newpass_username = msg_split[1]
+                        newpass_char_name = msg_split[1]
                         newpass_password = msg_split[2]
                         newpass_new_password = msg_split[3]
                         
                         self.db = DBPool('mrpg.db')
-                        user_exists = yield self.db.does_user_exist(newpass_username)
+                        char_exists = yield self.db.does_char_name_exist(newpass_char_name)
                         self.db.shutdown("")
-                        if(user_exists[0][0] == 0):
+                        if(char_exists[0][0] == 0):
                             self.msg(user, "There is not a character by that name.")
                         else:
                             self.db = DBPool('mrpg.db')
-                            passhash = yield self.db.get_password(newpass_username)
+                            passhash = yield self.db.get_password(newpass_char_name)
                             passhash = passhash[0][0]
                             self.db.shutdown("")
                             if(sc.verify(newpass_password, passhash)):
@@ -310,7 +341,7 @@ class Bot(irc.IRCClient):
                                 hash
                                 '$6$rounds=36122$kzMjVFTjgSVuPoS.$zx2RoZ2TYRHoKn71Y60MFmyqNPxbNnTZdwYD8y2atgoRIp923WJSbcbQc6Af3osdW96MRfwb5Hk7FymOM6D7J1'
                                 self.db = DBPool('mrpg.db')
-                                self.db.executeQuery("UPDATE users SET password = ? WHERE username = ?",(hash, newpass_username))
+                                self.db.executeQuery("UPDATE users SET password = ? WHERE char_name = ?",(hash, newpass_char_name))
                                 self.db.shutdown("")
                                 self.msg(user, "You have changed your password.")
                             else:
@@ -321,24 +352,24 @@ class Bot(irc.IRCClient):
                 @defer.inlineCallbacks
                 def dodelete():
                     if (lenow >= 3):
-                        delete_username = msg_split[1]
+                        delete_char_name = msg_split[1]
                         delete_password = msg_split[2]
                         
                         self.db = DBPool('mrpg.db')
-                        user_exists = yield self.db.does_user_exist(delete_username)
+                        char_exists = yield self.db.does_char_name_exist(delete_char_name)
                         self.db.shutdown("")
-                        if(user_exists[0][0] == 0):
+                        if(char_exists[0][0] == 0):
                             self.msg(user, "There is not a character by that name.")
                         else:
                             self.db = DBPool('mrpg.db')
-                            passhash = yield self.db.get_password(delete_username)
+                            passhash = yield self.db.get_password(delete_char_name)
                             passhash = passhash[0][0]
                             self.db.shutdown("")
                             if (sc.verify(delete_password, passhash)):
                                 self.db = DBPool('mrpg.db')
-                                self.db.executeQuery("DELETE FROM users WHERE username = ?",delete_username)
+                                self.db.executeQuery("DELETE FROM users WHERE char_name = ?",delete_char_name)
                                 self.db.shutdown("")
-                                self.msg(user, delete_username + " has been deleted.")
+                                self.msg(user, delete_char_name + " has been deleted.")
                             else:
                                 self.msg(user, "Password incorrect.")
                     else:
@@ -346,19 +377,20 @@ class Bot(irc.IRCClient):
                         
                 @defer.inlineCallbacks
                 def doactive():
-                    active_username = msg_split[1]
+                    active_char_name = msg_split[1]
                     self.db = DBPool('mrpg.db')
-                    user_exists = yield self.db.does_user_exist(active_username)
-                    if(user_exists[0][0] == 0):
+                    char_exists = yield self.db.does_char_name_exist(active_char_name)
+                    if(char_exists[0][0] == 0):
                         self.msg(user, "There is not a character by that name.")
                     else:
                         self.db = DBPool('mrpg.db')
-                        user_online = yield self.db.executeQuery("SELECT online FROM users WHERE username = ?",active_username)
+                        char_online = yield self.db.executeQuery("SELECT online FROM users WHERE char_name = ?",active_char_name)
                         self.db.shutdown("")
-                        if (user_online[0][0] == 0):
-                            self.msg(user, active_username + " is not online.")
+                        if (char_online[0][0] == 0):
+                            self.msg(user, active_char_name + " is not online.")
                         else:
-                            self.msg(user, active_username + " is online.")
+                            self.msg(user, active_char_name + " is online.")
+                
                 def dohelp():
                     self.msg(user, 'Available commands: REGISTER, LOGIN, LOGOUT, NEWPASS, DELETE, ACTIVE, HELP')
                 options = {
@@ -393,19 +425,93 @@ class Bot(irc.IRCClient):
 
     # irc callbacks
 
-    def irc_NICK(self, prefix, params):
-        """Called when an IRC user changes their nickname."""
-        old_nick = prefix.split('!')[0]
-        new_nick = params[0]
-        self.mrpg.performPenalty(new_nick, "Nickname change")
-
-        # TODO Issue #4 - Track user nickname change
-
     def nickservRegister(self):
         self.msg("nickserv", "register " + self.factory.nickserv_password + " " + self.factory.nickserv_email)
 
     def nickservIdentify(self):
         self.msg("nickserv", "identify " + self.factory.nickserv_password)
+    
+    #THIS FUNCTION CAUSES joined() TO NOT WORK, SO ONLY USE ONE OR THE OTHER, NOT BOTH
+    @defer.inlineCallbacks
+    def irc_JOIN(self, prefix, params):
+        #prefix ex. NeWtoz!~NeWtoz@2001:49f0:a000:n:jwn:tzoz:wuhi:zjhw
+        #params ex. ['#xero']
+        username = prefix.split('!',1)[0]
+        hostname = prefix.split('~',1)[1]
+
+        print "User: " + username + " with Host: " + hostname + " has joined the channel"
+        #check username and hostname, and if match, log in.
+        self.db = DBPool('mrpg.db')
+        temp = yield self.db.get_prefix(username)
+        #if multiple characters are allowed per username, goin to need a loop here
+        if not temp:
+            pass
+        elif(temp[0][0] == hostname):
+            self.db.make_user_online(username, hostname)
+            print "User: " + username + " with Host: " + hostname + " is being auto logged in"
+        else:
+            print "User: " + username + " with Host: " + hostname + " didn't qualify for auto login"
+        self.db.shutdown("")
+        
+    @defer.inlineCallbacks   
+    def irc_PART(self, prefix, params):
+        username = prefix.split('!',1)[0]
+        hostname = prefix.split('~',1)[1]
+        print "User: " + username + " with Host: " + hostname + " has left the channel"
+        self.db = DBPool('mrpg.db')
+        is_online = yield self.db.is_user_online(username)
+        db_prefix = yield self.db.get_prefix(username)
+        if not is_online:
+            pass
+        elif(is_online[0][0] == 1 and db_prefix[0][0] == hostname):
+            self.db.make_user_offline(username, hostname)
+        self.db.shutdown("")
+    
+    @defer.inlineCallbacks   
+    def irc_QUIT(self, prefix, params):
+        username = prefix.split('!',1)[0]
+        hostname = prefix.split('~',1)[1]
+        print "User: " + username + " with Host: " + hostname + " has quit the server"
+        self.db = DBPool('mrpg.db')
+        is_online = yield self.db.is_user_online(username)
+        db_prefix = yield self.db.get_prefix(username)
+        if not is_online:
+            pass
+        elif(is_online[0][0] == 1 and db_prefix[0][0] == hostname):
+            self.db.make_user_offline(username, hostname)
+        self.db.shutdown("")
+
+    #This function is pretty useless for double checking without getting a hostname.
+    #Further work needs to be done
+    #
+    #@defer.inlineCallbacks   
+    def irc_KICK(self, prefix, params):
+        pass
+        #kicker = prefix
+        #kickee = params[1]
+        #print kicker + " has kicked " + kickee
+        #self.db = DBPool('mrpg.db')
+        #is_online = yield self.db.is_user_online(kickee)
+        #if not is_online:
+            #pass
+        #elif(is_online[0][0] == 1):
+            #self.db.make_user_offline(kickee,hostname)
+        #self.db.shutdown("")
+         
+    @defer.inlineCallbacks   
+    def irc_NICK(self, prefix, params):
+        old_username = prefix.split('!',1)[0]
+        hostname = prefix.split('~',1)[1]
+        new_username = params[0]
+        print "User: " + old_username + " with Host: " + hostname + " has changed their name to " + new_username
+        self.db = DBPool('mrpg.db')
+        is_online = yield self.db.is_user_online(old_username)
+        db_prefix = yield self.db.get_prefix(old_username)
+        if not is_online:
+            pass
+        elif(is_online[0][0] == 1 and db_prefix[0][0] == hostname):
+            self.db.update_username(old_username, new_username, hostname)
+        self.db.shutdown("")
 
 class BotFactory(protocol.ClientFactory):
     """A factory for Bots.
