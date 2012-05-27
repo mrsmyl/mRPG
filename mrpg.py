@@ -181,7 +181,7 @@ class DBPool:
     
 class Bot(irc.IRCClient):
     def privateMessage(self, user, msg):
-        if self.factory.use_private_message == "Y":
+        if self.factory.use_private_message == 1:
             self.msg(user, msg)
         else:
             self.notice(user, msg)
@@ -535,7 +535,7 @@ class BotFactory(protocol.ClientFactory):
         self.nickname = config.get('IRC', 'nickname')
         self.nickserv_password = config.get('IRC', 'nickserv_password')
         self.nickserv_email = config.get('IRC', 'nickserv_email')
-        self.use_private_message = config.get('BOT', 'use_private_message')
+        self.use_private_message = config.getint('BOT', 'use_private_message')
 
     def buildProtocol(self, addr):
         p = Bot()

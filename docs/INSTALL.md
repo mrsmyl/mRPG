@@ -24,7 +24,7 @@ nickserv_email = mrpg@mozor.net
 timespan = 10.0
 min_time = 30
 penalty_constant = 1.1
-use_private_message = Y
+use_private_message = 1
 ````
 
 Example Configuration Explanation
@@ -51,5 +51,5 @@ Example Configuration Explanation
 	Minimum time between levels
 * **penalty_constant** _float_  
 	Constant to multiply the current TTL by for penalty actions
-* **use_private_message** _string [Y/N]_  
-	Y means the bot will use a private message to a user for a private message, N means he will use a notice instead.
+* **use_private_message** _integer [1/0]_  
+	1 means the bot will use a private message to a user for a private message, 0 means he will use a notice instead.
