@@ -1,13 +1,20 @@
 Install file for mRPG
 ========
 Copyright 2012 [Greg](https://github.com/newtoz) & [Richard](https://github.com/richard4339)  
-Licensed under the Creative Commons BY-NC-SA license. 
+Licensed under the Creative Commons BY-NC-SA license.
 
 Software needed for mRPG
 --------
 * Python (http://www.python.org)
 * Twisted (http://twistedmatrix.com)
 * passlib (https://code.google.com/p/passlib/)
+
+How To Install
+--------
+1. Ensure you have the prerequisite software
+2. Run ```python scripts\install.py```
+3. Edit your new config.cfg
+4. Run the script itself ```python mrpg.py```
 
 Example Configuration File
 --------
