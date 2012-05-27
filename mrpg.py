@@ -13,12 +13,14 @@ from twisted.words.protocols import irc
 from twisted.internet import reactor, protocol, task, defer
 from twisted.python import log
 from twisted.enterprise import adbapi
-import time, sys
+import time, sys, random
 import ConfigParser
 from passlib.hash import sha512_crypt as sc
 
 # Global Variables
 is_started = 0
+schema_version = 0.0
+min_version = 0.2
 
 class mrpg:
     def __init__(self, parent):
@@ -66,11 +68,52 @@ class mrpg:
             message = str(message)
             timestamp = time.strftime("[%b %d, %Y - %X] ")
             f.write("%s%s\n" % (timestamp, message))
+
+    @defer.inlineCallbacks
+    def doevent(self):
+        entropy = self.parent.factory.event_randomness
+        rand = random.randrange(1,100)
+
+        if(rand <= entropy):
+            self.db = DBPool('mrpg.db')
+            event = yield self.db.get_event()
+            user = yield self.db.get_random_user(1)
+
+            if event and user:
+
+                name = event[0][0]
+                type = event[0][1]
+                modifier = event[0][2]
+                username = user[0][0]
+
+                ttl = yield self.db.get_user_ttl(username)
+
+                if ttl:
+                    diff = ttl[0][0] * modifier - ttl[0][0]
+                    message = "A " + str(type) + " occurred!"
+                    self.msg(message)
+                    message = str(username) + " " + str(name) + "."
+                    self.msg(message)
+
+                    self.db.updateUserTimeMultiplier(str(username), modifier)
+
+
+                    if(diff > 0):
+                        message = str(diff) + " seconds has been added to " + str(username) + "'s time"
+                    else:
+                        message = str(diff * -1) + " seconds has been removed from " + str(username) + "'s time"
+                    self.msg(message)
+
+
+            self.db.shutdown("")
+
         
     def rpg(self):
         self.db.updateAllUsersTime(timespan * -1)
 
         self.db.levelUp()
+
+        self.doevent()
 
         # self.db.getAllUsers()
 
@@ -187,6 +230,23 @@ class DBPool:
     def update_username(self, old_username, new_username, hostname):
         query = 'UPDATE users SET username = replace(username, ?, ?), hostname = ? where username = ?'
         return self.__dbpool.runQuery(query, (old_username, new_username, hostname, old_username))
+
+    def get_event(self):
+        limit = 1
+        query = 'SELECT event_name, event_type, event_modifier FROM events ORDER BY RANDOM() LIMIT ?'
+        return self.__dbpool.runQuery(query, [limit])
+
+    def get_random_user(self, limit):
+        query = 'SELECT username FROM users WHERE online = 1 ORDER BY RANDOM() LIMIT ?'
+        return self.__dbpool.runQuery(query, [limit])
+
+    def get_user_ttl(self, user):
+        query = 'SELECT ttl FROM users WHERE username = ?'
+        return self.__dbpool.runQuery(query, [user])
+
+    def get_program_meta(self, name):
+        query = 'SELECT value FROM mrpg_meta WHERE name = ?'
+        return self.__dbpool.runQuery(query, [name])
     
 class Bot(irc.IRCClient):
     def privateMessage(self, user, msg):
@@ -559,6 +619,7 @@ class BotFactory(protocol.ClientFactory):
         self.nickserv_password = config.get('IRC', 'nickserv_password')
         self.nickserv_email = config.get('IRC', 'nickserv_email')
         self.use_private_message = config.getint('BOT', 'use_private_message')
+        self.event_randomness = config.getint('BOT','event_randomness')
 
     def buildProtocol(self, addr):
         p = Bot()
