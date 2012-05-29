@@ -77,7 +77,7 @@ else:
     conn.commit()
 
     # Insert Version
-    c.execute('''INSERT INTO mrpg_meta VALUES('VERSION','0.1')''')
+    c.execute('''INSERT INTO mrpg_meta VALUES('VERSION','0.3')''')
 
     conn.commit()
 
