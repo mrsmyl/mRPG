@@ -2,7 +2,7 @@
 
 # mRPG
 # https://github.com/mozor/mRPG
-# Version 0.2
+# Version 0.3
 #
 # Copyright 2012 Greg (NeWtoz@mozor.net) & Richard (richard@mozor.net);
 # This work is licensed under the Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
@@ -15,14 +15,12 @@ from twisted.python import log
 from twisted.enterprise import adbapi
 import time, sys, random, math
 import ConfigParser
+import sqlite3 as lite
 from passlib.hash import sha512_crypt as sc
 
 # Global Variables
 is_started = 0
-schema_version = 0.3
-min_version = 0.3
-
-
+min_schema_ver_needed = 0.3
 
 class mrpg:
     def __init__(self, parent):
@@ -40,7 +38,6 @@ class mrpg:
         print "Starting mRPG"
         self.msg("Please standby")
         print "Please standby"
-
         # Start the reactor task that repeatedly loops through actions
         self.l.start(timespan)
         self.loc.start(movespan)
@@ -716,24 +713,36 @@ class BotFactory(protocol.ClientFactory):
 if __name__ == '__main__':
     # initialize logging
     log.startLogging(sys.stdout)
+    
+    con = lite.connect('mrpg.db')
+    with con:    
+        cur = con.cursor()    
+        cur.execute("SELECT value FROM mrpg_meta WHERE name = 'VERSION'")
+        version = cur.fetchone()
+        if float(version[0]) < min_schema_ver_needed:
+            for x in range(0,20): 
+                print "Your DB version is out of date. Please upgrade."
+            sys.exit("Shutting down")
+        else:
+            print "Your DB version is compatable. Continuing to loast."
 
-    config = ConfigParser.RawConfigParser()
-    config.read('config.cfg')
+            config = ConfigParser.RawConfigParser()
+            config.read('config.cfg')
 
-    server = config.get('IRC', 'server')
-    port = config.getint('IRC', 'port')
-    botname = config.get('IRC', 'nickname')
-    timespan = config.getfloat('BOT', 'timespan')
-    min_time = config.getint('BOT', 'min_time')
-    penalty_constant = config.getfloat('BOT', 'penalty_constant')
-    movespan = config.getfloat('MOV', 'movespan')
-    world_radius = config.getfloat('MOV', 'world_radius')
-    walking_speed = config.getfloat('MOV', 'walking_speed')
-    # create factory protocol and application
-    f = BotFactory()
+            server = config.get('IRC', 'server')
+            port = config.getint('IRC', 'port')
+            botname = config.get('IRC', 'nickname')
+            timespan = config.getfloat('BOT', 'timespan')
+            min_time = config.getint('BOT', 'min_time')
+            penalty_constant = config.getfloat('BOT', 'penalty_constant')
+            movespan = config.getfloat('MOV', 'movespan')
+            world_radius = config.getfloat('MOV', 'world_radius')
+            walking_speed = config.getfloat('MOV', 'walking_speed')
+            # create factory protocol and application
+            f = BotFactory()
 
-    # connect factory to this host and port
-    reactor.connectTCP(server, port, f)
+            # connect factory to this host and port
+            reactor.connectTCP(server, port, f)
 
-    # run bot
-    reactor.run()
+            # run bot
+            reactor.run()
