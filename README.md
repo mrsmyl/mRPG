@@ -10,8 +10,7 @@ Upcoming Features
 ------------
 View our [milestones](https://github.com/mozor/mRPG/issues/milestones) for a complete list.
 
-* Events
-* Maps
+* Version control
 * Battles
 * Quests
 * Items
