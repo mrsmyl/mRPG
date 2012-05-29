@@ -30,7 +30,7 @@ else:
 
     # Create Users Table
     c.execute('''CREATE TABLE users
-                (username TEXT PRIMARY KEY, char_name TEXT, password TEXT, char_class TEXT, hostname TEXT, level NUMERIC, ttl NUMERIC, online INT, registration_date TEXT DEFAULT CURRENT_TIMESTAMP, last_login TEXT DEFAULT CURRENT_TIMESTAMP)''')
+                (username TEXT PRIMARY KEY, char_name TEXT, password TEXT, char_class TEXT, hostname TEXT, level NUMERIC, ttl NUMERIC, online INT, path_endpointx TEXT, path_endpointy TEXT, cordx TEXT, cordy TEXT, path_ttl NUMERIC, registration_date TEXT DEFAULT CURRENT_TIMESTAMP, last_login TEXT DEFAULT CURRENT_TIMESTAMP)''')
 
     conn.commit()
 
@@ -38,6 +38,12 @@ else:
     c.execute('''CREATE TABLE events
                 (id INTEGER PRIMARY KEY, event_name TEXT, event_type TEXT, event_modifier NUMERIC)''')
 
+    conn.commit()
+    
+    # Create Movement History Table
+    c.execute(''' CREATE TABLE movement_history 
+                (id INTEGER PRIMARY KEY, char_name TEXT, x NUMERIC, y NUMERIC, movement_date TEXT DEFAULT CURRENT_TIMESTAMP)''')
+                
     conn.commit()
 
     # Insert Our Events

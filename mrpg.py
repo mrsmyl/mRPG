@@ -13,20 +13,25 @@ from twisted.words.protocols import irc
 from twisted.internet import reactor, protocol, task, defer
 from twisted.python import log
 from twisted.enterprise import adbapi
-import time, sys, random
+import time, sys, random, math
 import ConfigParser
 from passlib.hash import sha512_crypt as sc
 
 # Global Variables
 is_started = 0
-schema_version = 0.0
-min_version = 0.2
+schema_version = 0.3
+min_version = 0.3
+
+
 
 class mrpg:
     def __init__(self, parent):
+        
         self.parent = parent
         self.channel = parent.factory.channel
         self.l = task.LoopingCall(self.rpg)
+        self.loc = task.LoopingCall(self.location)
+        self.loc2 = task.LoopingCall(self.updateLocationDaily)
         self.db = DBPool('mrpg.db')
         self.db.mrpg = self
 
@@ -38,6 +43,8 @@ class mrpg:
 
         # Start the reactor task that repeatedly loops through actions
         self.l.start(timespan)
+        self.loc.start(movespan)
+        self.loc2.start(86400)
         global is_started
         is_started = 1
         self.msg("Initialization complete")
@@ -46,12 +53,19 @@ class mrpg:
     def stop(self):
         self.msg("I think my loop needs to stop")
         self.l.stop()
+        self.loc.stop()
         global is_started
         is_started = 0
         self.msg("It stopped")
 
     def msg(self, msg):
         self.parent.msg(self.channel, msg)
+        
+    def privateMessage(self, user, msg):
+        if self.factory.use_private_message == 1:
+            self.msg(user, msg)
+        else:
+            self.notice(user, msg)
 
     @defer.inlineCallbacks
     def performPenalty(self, user, reason):
@@ -109,16 +123,73 @@ class mrpg:
 
         
     def rpg(self):
+        self.db = DBPool('mrpg.db')
         self.db.updateAllUsersTime(timespan * -1)
+        self.db.shutdown("")
 
+        self.db = DBPool('mrpg.db')
         self.db.levelUp()
+        self.db.shutdown("")
 
+        self.db = DBPool('mrpg.db')
         self.doevent()
+        self.db.shutdown("")
 
         # self.db.getAllUsers()
 
         # self.db.shutdown("")
+        
+    def location(self):
+        self.updateLocation()
 
+    @defer.inlineCallbacks
+    def updateLocation(self):
+        dist = movespan * walking_speed / 3600.00000
+        self.db = DBPool('mrpg.db')
+        s = yield self.db.executeQuery("UPDATE users SET path_ttl = path_ttl - ? WHERE online = 1",movespan)
+        temp = yield self.db.executeQuery("SELECT username, path_ttl, path_endpointx, path_endpointy, cordx, cordy, char_name FROM users WHERE online = 1","NONE") 
+        for s in temp:
+            lat1 = math.radians(float(s[4]))
+            long1 = math.radians(float(s[5]))
+            lat2 = math.radians(float(s[2]))
+            long2 = math.radians(float(s[3]))
+            
+            bear = math.atan2(math.sin(long2-long1)*math.cos(lat2), math.cos(lat1) * math.sin(lat2) - math.sin(lat1) * math.cos(lat2) * math.cos(long2 - long1))
+            destx = math.asin( math.sin(lat1) * math.cos(dist/world_radius) + math.cos(lat1) * math.sin(dist/world_radius) * math.cos(bear) ) 
+            desty = long1 + math.atan2( math.sin(bear) * math.sin(dist/world_radius) * math.cos(lat1), math.cos(dist/world_radius) - math.sin(lat1)*math.sin(destx) )
+            
+            destx = round(math.degrees(destx),5)
+            desty = round(math.degrees(desty),5)
+            
+            t = yield self.db.executeQuery("UPDATE users SET cordx = ?, cordy = ? WHERE username = ?",(destx,desty,s[0]))
+            
+            if s[1] <= 0:
+                gpsx = random.randint(-9000000,9000000)/100000.0
+                gpsy = random.randint(-18000000,18000000)/100000.0
+                self.db.executeQuery("UPDATE users SET path_ttl = 86400, path_endpointx = ?, path_endpointy = ? where username = ?",(gpsx, gpsy, s[0]))
+                
+            self.db.executeQuery("INSERT INTO movement_history (char_name,x,y) VALUES (?,?,?)",(s[6],destx,desty))
+        self.db.shutdown('')
+                
+    @defer.inlineCallbacks
+    def updateLocationDaily(self):
+        temp = yield self.db.executeQuery("SELECT username, path_ttl, path_endpointx, path_endpointy, cordx, cordy FROM users WHERE online = 1","NONE") 
+        for s in temp:
+            #if chance = 1: stay on path, 2: choose different path, 3: stay put.
+            chance = random.randint(1,3)
+            if chance == 1:
+                pass
+            elif chance == 2:
+                gpsx = random.randint(-9000000,9000000)/100000.0
+                gpsy = random.randint(-18000000,18000000)/100000.0
+                self.db = DBPool('mrpg.db')
+                self.db.executeQuery("UPDATE users SET path_endpointx = ?, path_endpointy = ? WHERE username = ?",(gpsx, gpsy, s[0]))
+                self.db.shutdown('')
+            elif chance == 3:
+                self.db = DBPool('mrpg.db')
+                self.db.executeQuery("UPDATE users SET path_endpointx = ?, path_endpointy = ? WHERE username = ?",(s[4],s[5],s[0]))
+                self.db.shutdown('')
+    
 class DBPool:
     """
         Sqlite connection pool
@@ -146,41 +217,48 @@ class DBPool:
     def showUser(self, output):
         for i in output:
             message = str(i[1]) + " will reach the next level in " + str(i[6]) + " seconds."
-            self.mrpg.msg(message)
+            #self.mrpg.privateMessage(user, message)
             print message
 
     def levelUp(self):
-        query = "SELECT username, level, ttl FROM users WHERE ttl < 0 AND online = 1"
+        query = "SELECT username, char_name, level, ttl FROM users WHERE ttl < 0 AND online = 1"
         s = self.__dbpool.runQuery(query).addCallback(self.showLevelUp)
 
     def showLevelUp(self, output):
         for i in output:
             user = str(i[0])
-            level = int(i[1])
+            char_name = str(i[1])
+            level = int(i[2])
 
             new_level = level + 1
             ttl = min_time * new_level
+            
+            message = char_name + " has reached level " +str(new_level)
+            #TODO fix these two messages
+            #self.mrpg.msg(message)
+            message = char_name + " will reach the next level in " +str(ttl) + " seconds"
+            #self.mrpg.msg(message)
 
-            message = user + " has reached level " +str(new_level)
-            self.mrpg.msg(message)
-            message = user + " will reach the next level in " +str(ttl) + " seconds"
-            self.mrpg.msg(message)
-            self.levelUpUser(user, level)
-            print user + " has reached level " +str(new_level)
+            self.db = self.__init__('mrpg.db')
+            self.levelUpUser(char_name, level)
+            self.shutdown("")
+            print char_name + " has reached level " +str(new_level)
 
     def getResults(self, output):
         return output
     
     def executeQuery(self, query, args):
+        if args == "NONE":
+            return self.__dbpool.runQuery(query)
         if (type(args) is tuple):
             return self.__dbpool.runQuery(query, (args))
         else:
             return self.__dbpool.runQuery(query, [args])
 
-    def levelUpUser(self, user, level):
+    def levelUpUser(self, char_name, level):
         new_level = level + 1
         ttl = min_time * new_level
-        return self.__dbpool.runQuery("UPDATE users SET ttl = ?, level = ? WHERE username = ?", (ttl, new_level, user, ))
+        return self.__dbpool.runQuery("UPDATE users SET ttl = ?, level = ? WHERE char_name = ?", (ttl, new_level, char_name))
 
     def updateUserTime(self, user, amount):
         return self.__dbpool.runOperation("UPDATE users SET ttl = ttl + ? WHERE username = ?", (amount, user,))
@@ -189,10 +267,11 @@ class DBPool:
         return self.__dbpool.runOperation("UPDATE users SET ttl = ROUND(ttl * ?,0) WHERE username = ?", (amount, user,))
 
     def updateAllUsersTime(self, amount):
-        return self.__dbpool.runOperation("UPDATE users SET ttl = ttl + ? WHERE online = 1", (amount,))
+        query = 'UPDATE users SET ttl = ttl + ? WHERE online = 1'
+        return self.__dbpool.runQuery(query, [amount])
         
     def register_char(self, user, reg_char_name, reg_password, reg_char_class, hostname):
-        query = 'INSERT INTO `users` (username,char_name,password,char_class,hostname,level,ttl,online) VALUES (?,?,?,?,?,1,?,1)'
+        query = 'INSERT INTO `users` (username,char_name,password,char_class,hostname,level,ttl,online,path_endpointx,path_endpointy,cordx,cordy,path_ttl) VALUES (?,?,?,?,?,1,?,1,0,0,10,10,0)'
         return self.__dbpool.runQuery(query, (user, reg_char_name, reg_password, reg_char_class, hostname, min_time))
 
     def get_password(self, char_name):
@@ -249,12 +328,12 @@ class DBPool:
         return self.__dbpool.runQuery(query, [name])
     
 class Bot(irc.IRCClient):
+
     def privateMessage(self, user, msg):
         if self.factory.use_private_message == 1:
             self.msg(user, msg)
         else:
             self.notice(user, msg)
-
 
     def _get_nickname(self):
         return self.factory.nickname
@@ -328,7 +407,7 @@ class Bot(irc.IRCClient):
                             self.db.register_char(user, reg_char_name, hash, reg_char_class, hostname)
                             self.db.shutdown("")
                             self.privateMessage(user, "Created new character " + reg_char_name)
-                            self.mrpg.msg("Welcome new character: " + reg_char_name + ", the " + reg_char_class)
+                            self.privateMessage(self.mrpg.channel, "Welcome new character: " + reg_char_name + ", the " + reg_char_class)
                     else:
                         self.privateMessage(user, "Not enough information was supplied.")
                 @defer.inlineCallbacks
@@ -647,6 +726,9 @@ if __name__ == '__main__':
     timespan = config.getfloat('BOT', 'timespan')
     min_time = config.getint('BOT', 'min_time')
     penalty_constant = config.getfloat('BOT', 'penalty_constant')
+    movespan = config.getfloat('MOV', 'movespan')
+    world_radius = config.getfloat('MOV', 'world_radius')
+    walking_speed = config.getfloat('MOV', 'walking_speed')
     # create factory protocol and application
     f = BotFactory()
 

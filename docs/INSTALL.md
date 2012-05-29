@@ -33,6 +33,11 @@ min_time = 30
 penalty_constant = 1.1
 use_private_message = 1
 event_randomness = 1
+
+[MOV]
+movespan = 120
+world_radius = 300
+walking_speed = 5
 ````
 
 Example Configuration Explanation
@@ -63,3 +68,11 @@ Example Configuration Explanation
 	1 means the bot will use a private message to a user for a private message, 0 means he will use a notice instead.
 * **event_randomness** _integer_  
 	The odds that you will get an event to trigger on each loop. 1 == lowest chance, 100 or higher == guaranteed. Entering 0 will effectively disable events altogether.
+
+### [MOV] ###
+* **movespan** _float_
+    How often the movement function runs.
+* **world_radius** _float_
+    The radius of the circular body the characters are inhabiting. Units are in km.
+* **walking_speed** _float_
+    How fast the characters move. Units are in km/h.
