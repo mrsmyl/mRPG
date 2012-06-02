@@ -2,7 +2,7 @@
 
 # mRPG
 # https://github.com/mozor/mRPG
-# Version 0.3
+# Version 0.4
 #
 # Copyright 2012 Greg (NeWtoz@mozor.net) & Richard (richard@mozor.net);
 # This work is licensed under the Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
@@ -20,17 +20,20 @@ from passlib.hash import sha512_crypt as sc
 
 # Global Variables
 is_started = 0
-min_schema_ver_needed = 0.3
+min_schema_ver_needed = 0.4
 
 class mrpg:
     def __init__(self, parent):
-        
+
+        global mrpg_ref
+
         self.parent = parent
         self.channel = parent.factory.channel
         self.l = task.LoopingCall(self.rpg)
         self.loc = task.LoopingCall(self.location)
         self.loc2 = task.LoopingCall(self.updateLocationDaily)
         self.db = DBPool('mrpg.db')
+        mrpg_ref = self
         self.db.mrpg = self
 
     def start(self):
@@ -54,10 +57,11 @@ class mrpg:
         global is_started
         is_started = 0
         self.msg("It stopped")
+        sys.exit()
 
     def msg(self, msg):
         self.parent.msg(self.channel, msg)
-        
+
     def privateMessage(self, user, msg):
         if self.factory.use_private_message == 1:
             self.msg(user, msg)
@@ -66,13 +70,24 @@ class mrpg:
 
     @defer.inlineCallbacks
     def performPenalty(self, user, reason):
+        self.db = DBPool('mrpg.db')
+        self.db.mrpg = self
+        print "in penalty function"
+        global is_started
+        print is_started
         if is_started == 1:
+            print "is_started"
             is_online = yield self.db.is_user_online(user)
             if is_online:
+                print "isonline"
                 if is_online[0][0] == 1:
+                    print "really is online"
                     self.msg(user + " has earned a penalty for: " + reason)
                     self.db.updateUserTimeMultiplier(user, penalty_constant)
                     self.db.getSingleUser(user)
+            else:
+                print "isnt online"
+        self.db.shutdown("")
 
     def writetofile(self, message):
         with open('output','a') as f:
@@ -85,10 +100,13 @@ class mrpg:
         entropy = self.parent.factory.event_randomness
         rand = random.randrange(1,100)
 
+        db = DBPool('mrpg.db')
+        db.mrpg = self
+
         if(rand <= entropy):
-            self.db = DBPool('mrpg.db')
-            event = yield self.db.get_event()
-            user = yield self.db.get_random_user(1)
+            print "running event"
+            event = yield db.get_event()
+            user = yield db.get_random_user(1)
 
             if event and user:
 
@@ -97,7 +115,7 @@ class mrpg:
                 modifier = event[0][2]
                 username = user[0][0]
 
-                ttl = yield self.db.get_user_ttl(username)
+                ttl = yield db.get_user_ttl(username)
 
                 if ttl:
                     diff = ttl[0][0] * modifier - ttl[0][0]
@@ -106,7 +124,7 @@ class mrpg:
                     message = str(username) + " " + str(name) + "."
                     self.msg(message)
 
-                    self.db.updateUserTimeMultiplier(str(username), modifier)
+                    db.updateUserTimeMultiplier(str(username), modifier)
 
 
                     if(diff > 0):
@@ -114,28 +132,105 @@ class mrpg:
                     else:
                         message = str(diff * -1) + " seconds has been removed from " + str(username) + "'s time"
                     self.msg(message)
+        db.shutdown("")
+
+    @defer.inlineCallbacks
+    def doitems(self):
+        entropy = self.parent.factory.item_randomness
+        rand = random.randrange(1,100)
+
+        db = DBPool('mrpg.db')
+        db.mrpg = self
+
+        if(rand <= entropy):
+            event = yield db.executeQuery('''      SELECT t.item_description
+                                                         ,i.item_name
+                                                         ,i.modifier
+                                                         ,i.special
+                                                         ,u.username
+                                                         ,u.level
+                                                         ,t.id
+                                                         ,i.id
+                                                         ,iu.item_type
+                                                     FROM items i
+                                                          INNER JOIN users u
+                                                                  ON u.username = (SELECT username
+                                                                                     FROM users
+                                                                                    WHERE online = 1
+                                                                                 ORDER BY RANDOM() LIMIT 1)
+                                                          INNER JOIN item_type t
+                                                                  ON i.item_type = t.id
+                                                          LEFT OUTER JOIN items_user iu
+                                                                  ON u.username = iu.username
+                                                                 AND t.id = iu.item_type
+                                                 ORDER BY RANDOM() LIMIT ?''', 1)
+
+            if event:
+
+                item_description = event[0][0]
+                item_name = event[0][1]
+                modifier = event[0][2]
+                special = event[0][3]
+                username = event[0][4]
+                level = event[0][5]
+                item_type = event[0][6]
+                item_id = event[0][7]
+                user_has_item_type = str(event[0][8])
+
+                if str(username) != "None":
 
 
-            self.db.shutdown("")
+                    rand = random.randrange(math.floor(int(level) / 2), level)
 
-        
+                    if rand < 1:
+                        rand = 1
+
+                    if user_has_item_type == "None":
+
+                        query =  '''INSERT INTO items_user
+                                               (username
+                                               ,item_id
+                                               ,item_type
+                                               ,level)
+                                        VALUES (?
+                                               ,?
+                                               ,?
+                                               ,?)'''
+
+                        s = yield db.executeQuery(query,(username, item_id, item_type, rand))
+
+                        message = str(username) + " found a "  + str(item_name) + " level " + str(rand) + " " + str(item_description) + ", an item they were currently without!"
+                    else:
+                        s = yield db.executeQuery("UPDATE items_user SET item_id = ?, level = ? WHERE username = ? AND item_type = ?",(item_id, rand, username, item_type))
+
+                        message = str(username) + " found a "  + str(item_name) + " level " + str(rand) + " " + str(item_description)
+
+                    self.msg(message)
+
+        db.shutdown("")
+
+
     def rpg(self):
         self.db = DBPool('mrpg.db')
+        self.db.mrpg = self
         self.db.updateAllUsersTime(timespan * -1)
         self.db.shutdown("")
 
         self.db = DBPool('mrpg.db')
+        self.db.mrpg = self
         self.db.levelUp()
         self.db.shutdown("")
 
         self.db = DBPool('mrpg.db')
+        self.db.mrpg = self
         self.doevent()
+        self.doitems()
         self.db.shutdown("")
 
         # self.db.getAllUsers()
 
         # self.db.shutdown("")
-        
+
     def location(self):
         self.updateLocation()
 
@@ -143,34 +238,35 @@ class mrpg:
     def updateLocation(self):
         dist = movespan * walking_speed / 3600.00000
         self.db = DBPool('mrpg.db')
+        self.db.mrpg = self
         s = yield self.db.executeQuery("UPDATE users SET path_ttl = path_ttl - ? WHERE online = 1",movespan)
-        temp = yield self.db.executeQuery("SELECT username, path_ttl, path_endpointx, path_endpointy, cordx, cordy, char_name FROM users WHERE online = 1","NONE") 
+        temp = yield self.db.executeQuery("SELECT username, path_ttl, path_endpointx, path_endpointy, cordx, cordy, char_name FROM users WHERE online = 1","NONE")
         for s in temp:
             lat1 = math.radians(float(s[4]))
             long1 = math.radians(float(s[5]))
             lat2 = math.radians(float(s[2]))
             long2 = math.radians(float(s[3]))
-            
+
             bear = math.atan2(math.sin(long2-long1)*math.cos(lat2), math.cos(lat1) * math.sin(lat2) - math.sin(lat1) * math.cos(lat2) * math.cos(long2 - long1))
-            destx = math.asin( math.sin(lat1) * math.cos(dist/world_radius) + math.cos(lat1) * math.sin(dist/world_radius) * math.cos(bear) ) 
+            destx = math.asin( math.sin(lat1) * math.cos(dist/world_radius) + math.cos(lat1) * math.sin(dist/world_radius) * math.cos(bear) )
             desty = long1 + math.atan2( math.sin(bear) * math.sin(dist/world_radius) * math.cos(lat1), math.cos(dist/world_radius) - math.sin(lat1)*math.sin(destx) )
-            
+
             destx = round(math.degrees(destx),5)
             desty = round(math.degrees(desty),5)
-            
+
             t = yield self.db.executeQuery("UPDATE users SET cordx = ?, cordy = ? WHERE username = ?",(destx,desty,s[0]))
-            
+
             if s[1] <= 0:
                 gpsx = random.randint(-9000000,9000000)/100000.0
                 gpsy = random.randint(-18000000,18000000)/100000.0
                 self.db.executeQuery("UPDATE users SET path_ttl = 86400, path_endpointx = ?, path_endpointy = ? where username = ?",(gpsx, gpsy, s[0]))
-                
+
             self.db.executeQuery("INSERT INTO movement_history (char_name,x,y) VALUES (?,?,?)",(s[6],destx,desty))
         self.db.shutdown('')
-                
+
     @defer.inlineCallbacks
     def updateLocationDaily(self):
-        temp = yield self.db.executeQuery("SELECT username, path_ttl, path_endpointx, path_endpointy, cordx, cordy FROM users WHERE online = 1","NONE") 
+        temp = yield self.db.executeQuery("SELECT username, path_ttl, path_endpointx, path_endpointy, cordx, cordy FROM users WHERE online = 1","NONE")
         for s in temp:
             #if chance = 1: stay on path, 2: choose different path, 3: stay put.
             chance = random.randint(1,3)
@@ -184,14 +280,18 @@ class mrpg:
                 self.db.shutdown('')
             elif chance == 3:
                 self.db = DBPool('mrpg.db')
+                self.db.mrpg = self
                 self.db.executeQuery("UPDATE users SET path_endpointx = ?, path_endpointy = ? WHERE username = ?",(s[4],s[5],s[0]))
                 self.db.shutdown('')
-    
+
 class DBPool:
     """
         Sqlite connection pool
     """
     def __init__(self, dbname):
+    #        global mrpg_ref
+    #        if mrpg_ref in globals():
+    #            self.mrpg = mrpg_ref
         self.dbname = dbname
         self.__dbpool = adbapi.ConnectionPool('sqlite3', self.dbname, check_same_thread=False)
 
@@ -214,7 +314,7 @@ class DBPool:
     def showUser(self, output):
         for i in output:
             message = str(i[1]) + " will reach the next level in " + str(i[6]) + " seconds."
-            #self.mrpg.privateMessage(user, message)
+            mrpg_ref.msg(message)
             print message
 
     def levelUp(self):
@@ -222,6 +322,7 @@ class DBPool:
         s = self.__dbpool.runQuery(query).addCallback(self.showLevelUp)
 
     def showLevelUp(self, output):
+        global mrpg_ref
         for i in output:
             user = str(i[0])
             char_name = str(i[1])
@@ -229,21 +330,22 @@ class DBPool:
 
             new_level = level + 1
             ttl = min_time * new_level
-            
+
             message = char_name + " has reached level " +str(new_level)
             #TODO fix these two messages
-            #self.mrpg.msg(message)
+            mrpg_ref.msg(message)
             message = char_name + " will reach the next level in " +str(ttl) + " seconds"
-            #self.mrpg.msg(message)
+            mrpg_ref.msg(message)
 
             self.db = self.__init__('mrpg.db')
             self.levelUpUser(char_name, level)
             self.shutdown("")
-            print char_name + " has reached level " +str(new_level)
+            #message = char_name + " has reached level " +str(new_level)
+            #mrpg_ref.msg(message)
 
     def getResults(self, output):
         return output
-    
+
     def executeQuery(self, query, args):
         if args == "NONE":
             return self.__dbpool.runQuery(query)
@@ -266,7 +368,7 @@ class DBPool:
     def updateAllUsersTime(self, amount):
         query = 'UPDATE users SET ttl = ttl + ? WHERE online = 1'
         return self.__dbpool.runQuery(query, [amount])
-        
+
     def register_char(self, user, reg_char_name, reg_password, reg_char_class, hostname):
         query = 'INSERT INTO `users` (username,char_name,password,char_class,hostname,level,ttl,online,path_endpointx,path_endpointy,cordx,cordy,path_ttl) VALUES (?,?,?,?,?,1,?,1,0,0,10,10,0)'
         return self.__dbpool.runQuery(query, (user, reg_char_name, reg_password, reg_char_class, hostname, min_time))
@@ -278,19 +380,19 @@ class DBPool:
     def is_char_online(self, char_name):
         query = 'SELECT online from users where char_name = ?'
         return self.__dbpool.runQuery(query, [char_name])
-        
+
     def is_user_online(self, username):
         query = 'SELECT online from users where username = ?'
         return self.__dbpool.runQuery(query, [username])
-        
+
     def does_char_name_exist(self, reg_char_exist):
         query = 'SELECT count(*) from users WHERE char_name = ?'
         return self.__dbpool.runQuery(query, [reg_char_exist])
-        
+
     def make_user_online(self, username, hostname):
         query = 'UPDATE users SET online = 1, hostname = ? WHERE username = ?'
         return self.__dbpool.runQuery(query, (hostname,username))
-        
+
     def make_user_offline(self, username, hostname):
         if hostname == "":
             query = 'UPDATE users SET online = 0 WHERE username = ?'
@@ -298,11 +400,11 @@ class DBPool:
         else:
             query = 'UPDATE users SET online = 0, hostname = ? WHERE username = ?'
             return self.__dbpool.runQuery(query, (hostname,username))
-    
+
     def get_prefix(self, username):
         query = 'SELECT hostname FROM users WHERE username = ?'
         return self.__dbpool.runQuery(query, [username])
-    
+
     def update_username(self, old_username, new_username, hostname):
         query = 'UPDATE users SET username = replace(username, ?, ?), hostname = ? where username = ?'
         return self.__dbpool.runQuery(query, (old_username, new_username, hostname, old_username))
@@ -310,6 +412,15 @@ class DBPool:
     def get_event(self):
         limit = 1
         query = 'SELECT event_name, event_type, event_modifier FROM events ORDER BY RANDOM() LIMIT ?'
+        return self.__dbpool.runQuery(query, [limit])
+
+    def get_item(self):
+        limit = 1
+        query = '''SELECT t.item_description, i.item_name, i.modifier, i.special
+                    FROM items i
+                    INNER JOIN item_type t
+                    ON i.item_type = t.id
+                    ORDER BY RANDOM() LIMIT ?'''
         return self.__dbpool.runQuery(query, [limit])
 
     def get_random_user(self, limit):
@@ -323,7 +434,7 @@ class DBPool:
     def get_program_meta(self, name):
         query = 'SELECT value FROM mrpg_meta WHERE name = ?'
         return self.__dbpool.runQuery(query, [name])
-    
+
 class Bot(irc.IRCClient):
 
     def privateMessage(self, user, msg):
@@ -354,9 +465,9 @@ class Bot(irc.IRCClient):
         #see comment below on def join()
         self.mrpg.start()
 
-    #This was moved to signedOn so irc_JOIN works.
-    # not sure if this will cause problems or not.
-    #def joined(self, channel):
+        #This was moved to signedOn so irc_JOIN works.
+        # not sure if this will cause problems or not.
+        #def joined(self, channel):
         #self.mrpg.start()
 
     def privmsg(self, user, channel, msg):
@@ -390,7 +501,7 @@ class Bot(irc.IRCClient):
                         reg_password = msg_split[2]
                         reg_char_class = msg_split[3::1]
                         reg_char_class = ' '.join(reg_char_class)
-                        
+
                         self.db = DBPool('mrpg.db')
                         char_exists = yield self.db.does_char_name_exist(reg_char_name)
                         self.db.shutdown("")
@@ -402,9 +513,23 @@ class Bot(irc.IRCClient):
                             '$6$rounds=36122$kzMjVFTjgSVuPoS.$zx2RoZ2TYRHoKn71Y60MFmyqNPxbNnTZdwYD8y2atgoRIp923WJSbcbQc6Af3osdW96MRfwb5Hk7FymOM6D7J1'
                             self.db = DBPool('mrpg.db')
                             self.db.register_char(user, reg_char_name, hash, reg_char_class, hostname)
+                            query =      '''INSERT INTO items_user
+                                                       (username
+                                                       ,item_id
+                                                       ,item_type
+                                                       ,level)
+                                                 SELECT ?
+                                                       ,(SELECT id
+                                                           FROM items
+                                                          WHERE item_type = t.id
+                                                       ORDER BY RANDOM() LIMIT 1)
+                                                       ,t.id
+                                                       ,1
+                                                   FROM item_type t'''
+                            self.db.executeQuery(query,(user))
                             self.db.shutdown("")
                             self.privateMessage(user, "Created new character " + reg_char_name)
-                            self.privateMessage(self.mrpg.channel, "Welcome new character: " + reg_char_name + ", the " + reg_char_class)
+                            self.msg(self.mrpg.channel, "Welcome new character: " + reg_char_name + ", the " + reg_char_class)
                     else:
                         self.privateMessage(user, "Not enough information was supplied.")
                 @defer.inlineCallbacks
@@ -437,7 +562,7 @@ class Bot(irc.IRCClient):
                                 self.privateMessage(user, "You are already logged in")
                     else:
                         self.privateMessage(user, "Not enough information was supplied.")
-           
+
                 @defer.inlineCallbacks
                 def dologout():
                     if (lenow >= 3):
@@ -468,14 +593,14 @@ class Bot(irc.IRCClient):
                                 self.privateMessage(user, "You are not logged in")
                     else:
                         self.privateMessage(user, "Not enough information was supplied.")
-              
+
                 @defer.inlineCallbacks
                 def donewpass():
                     if (lenow >= 4):
                         newpass_char_name = msg_split[1]
                         newpass_password = msg_split[2]
                         newpass_new_password = msg_split[3]
-                        
+
                         self.db = DBPool('mrpg.db')
                         char_exists = yield self.db.does_char_name_exist(newpass_char_name)
                         self.db.shutdown("")
@@ -498,13 +623,13 @@ class Bot(irc.IRCClient):
                                 self.privateMessage(user, "Password incorrect.")
                     else:
                         self.privateMessage(user, "Not enough information was supplied.")
-                
+
                 @defer.inlineCallbacks
                 def dodelete():
                     if (lenow >= 3):
                         delete_char_name = msg_split[1]
                         delete_password = msg_split[2]
-                        
+
                         self.db = DBPool('mrpg.db')
                         char_exists = yield self.db.does_char_name_exist(delete_char_name)
                         self.db.shutdown("")
@@ -524,7 +649,7 @@ class Bot(irc.IRCClient):
                                 self.privateMessage(user, "Password incorrect.")
                     else:
                         self.privateMessage(user, "Not enough information was supplied.")
-                        
+
                 @defer.inlineCallbacks
                 def doactive():
                     active_char_name = msg_split[1]
@@ -540,7 +665,7 @@ class Bot(irc.IRCClient):
                             self.privateMessage(user, active_char_name + " is not online.")
                         else:
                             self.privateMessage(user, active_char_name + " is online.")
-                
+
                 def dohelp():
                     self.privateMessage(user, 'Available commands: REGISTER, LOGIN, LOGOUT, NEWPASS, DELETE, ACTIVE, HELP')
                 options = {
@@ -580,7 +705,7 @@ class Bot(irc.IRCClient):
 
     def nickservIdentify(self):
         self.msg("nickserv", "identify " + self.factory.nickserv_password)
-    
+
     #THIS FUNCTION CAUSES joined() TO NOT WORK, SO ONLY USE ONE OR THE OTHER, NOT BOTH
     @defer.inlineCallbacks
     def irc_JOIN(self, prefix, params):
@@ -602,8 +727,8 @@ class Bot(irc.IRCClient):
         else:
             print "User: " + username + " with Host: " + hostname + " didn't qualify for auto login"
         self.db.shutdown("")
-        
-    @defer.inlineCallbacks   
+
+    @defer.inlineCallbacks
     def irc_PART(self, prefix, params):
 
         # Update the database
@@ -623,8 +748,8 @@ class Bot(irc.IRCClient):
         elif(is_online[0][0] == 1 and db_prefix[0][0] == hostname):
             self.db.make_user_offline(username, hostname)
         self.db.shutdown("")
-    
-    @defer.inlineCallbacks   
+
+    @defer.inlineCallbacks
     def irc_QUIT(self, prefix, params):
 
         # Update the database
@@ -657,8 +782,8 @@ class Bot(irc.IRCClient):
         elif(is_online[0][0] == 1):
             self.db.make_user_offline(kickee, "")
         self.db.shutdown("")
-         
-    @defer.inlineCallbacks   
+
+    @defer.inlineCallbacks
     def irc_NICK(self, prefix, params):
         # Update the database with the new username information
         old_username = prefix.split('!',1)[0]
@@ -696,6 +821,7 @@ class BotFactory(protocol.ClientFactory):
         self.nickserv_email = config.get('IRC', 'nickserv_email')
         self.use_private_message = config.getint('BOT', 'use_private_message')
         self.event_randomness = config.getint('BOT','event_randomness')
+        self.item_randomness = config.getint('BOT','item_randomness')
 
     def buildProtocol(self, addr):
         p = Bot()
@@ -713,18 +839,18 @@ class BotFactory(protocol.ClientFactory):
 if __name__ == '__main__':
     # initialize logging
     log.startLogging(sys.stdout)
-    
+
     con = lite.connect('mrpg.db')
-    with con:    
-        cur = con.cursor()    
+    with con:
+        cur = con.cursor()
         cur.execute("SELECT value FROM mrpg_meta WHERE name = 'VERSION'")
         version = cur.fetchone()
         if float(version[0]) < min_schema_ver_needed:
-            for x in range(0,20): 
+            for x in range(0,20):
                 print "Your DB version is out of date. Please upgrade."
             sys.exit("Shutting down")
         else:
-            print "Your DB version is compatable. Continuing to loast."
+            print "Your DB version is compatible. Continuing to load."
 
             config = ConfigParser.RawConfigParser()
             config.read('config.cfg')
