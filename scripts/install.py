@@ -19,7 +19,7 @@ db = "mrpg.db"
 config = "config.cfg"
 
 if os.path.isfile(db):
-	print("The database file has already been created.")
+    print("The database file has already been created.")
 else:
     open(db, "w").close()
     print("The empty database file has been created.")
@@ -39,11 +39,65 @@ else:
                 (id INTEGER PRIMARY KEY, event_name TEXT, event_type TEXT, event_modifier NUMERIC)''')
 
     conn.commit()
-    
+
+    # Create Items Tables
+    c.execute('''CREATE TABLE item_type
+                (
+                    id               INTEGER PRIMARY KEY,
+                    item_type        TEXT,
+                    item_description TEXT
+                )''')
+
+    conn.commit()
+
+    c.execute('''CREATE TABLE items
+                (
+                    id        INTEGER PRIMARY KEY,
+                    item_type INTEGER,
+                    item_name TEXT,
+                    modifier  NUMERIC,
+                    special   BOOL
+                )''')
+
+    conn.commit()
+
+    c.execute('''CREATE TABLE items_user
+                (
+                    id        INTEGER PRIMARY KEY,
+                    username  TEXT,
+                    item_id   INTEGER,
+                    item_type INTEGER,
+                    level     INTEGER
+                )''')
+
+    conn.commit()
+
+    # Insert Our Item Types and Items
+    c.execute('''INSERT INTO item_type (item_type, item_description) VALUES ('shield', 'shield')''')
+    c.execute('''INSERT INTO item_type (item_type, item_description) VALUES ('weapon', 'weapon')''')
+    c.execute('''INSERT INTO item_type (item_type, item_description) VALUES ('boots', 'boots')''')
+    c.execute('''INSERT INTO item_type (item_type, item_description) VALUES ('armor', 'armor')''')
+    c.execute('''INSERT INTO items (item_type, item_name, modifier, special) VALUES (1, 'shield', 1, 0)''')
+    c.execute('''INSERT INTO items (item_type, item_name, modifier, special) VALUES (1, 'nonexistant', 0, 0)''')
+    c.execute('''INSERT INTO items (item_type, item_name, modifier, special) VALUES (2, 'sword', 1, 0)''')
+    c.execute('''INSERT INTO items (item_type, item_name, modifier, special) VALUES (2, 'axe', 1, 0)''')
+    c.execute('''INSERT INTO items (item_type, item_name, modifier, special) VALUES (2, 'mace', 1, 0)''')
+    c.execute('''INSERT INTO items (item_type, item_name, modifier, special) VALUES (2, 'club', 1, 0)''')
+    c.execute('''INSERT INTO items (item_type, item_name, modifier, special) VALUES (2, 'stick', 1, 0)''')
+    c.execute('''INSERT INTO items (item_type, item_name, modifier, special) VALUES (2, 'death ray', 1, 0)''')
+    c.execute('''INSERT INTO items (item_type, item_name, modifier, special) VALUES (2, 'dagger', 1, 0)''')
+    c.execute('''INSERT INTO items (item_type, item_name, modifier, special) VALUES (2, 'rubber chicken', 0.5, 0)''')
+    c.execute('''INSERT INTO items (item_type, item_name, modifier, special) VALUES (3, 'leather boots', 1, 0)''')
+    c.execute('''INSERT INTO items (item_type, item_name, modifier, special) VALUES (3, 'lizard boots', 1, 0)''')
+    c.execute('''INSERT INTO items (item_type, item_name, modifier, special) VALUES (3, 'high heels', 0.9, 0)''')
+    c.execute('''INSERT INTO items (item_type, item_name, modifier, special) VALUES (4, 'leather armor', 1, 0)''')
+    c.execute('''INSERT INTO items (item_type, item_name, modifier, special) VALUES (4, 'chain mail', 1, 0)''')
+    c.execute('''INSERT INTO items (item_type, item_name, modifier, special) VALUES (4, 'birthday suit', 0.1, 0)''')
+
     # Create Movement History Table
     c.execute(''' CREATE TABLE movement_history 
                 (id INTEGER PRIMARY KEY, char_name TEXT, x NUMERIC, y NUMERIC, movement_date TEXT DEFAULT CURRENT_TIMESTAMP)''')
-                
+
     conn.commit()
 
     # Insert Our Events
@@ -87,7 +141,7 @@ else:
     print("The database has been created.")
 
 if os.path.isfile(config):
-	print("The config file has already been created.")
+    print("The config file has already been created.")
 else:
-	shutil.copy2("docs/example.cfg", config)
-	print("Please modify config.cfg before running for the first time.")
+    shutil.copy2("docs/example.cfg", config)
+    print("Please modify config.cfg before running for the first time.")
