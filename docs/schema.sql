@@ -58,8 +58,9 @@ CREATE TABLE items
 
 CREATE TABLE items_user
   (
-     id       INTEGER PRIMARY KEY,
-     username TEXT,
-     item_id  INTEGER,
-     level    INTEGER
-  ) 
+     id        INTEGER PRIMARY KEY,
+     username  TEXT,
+     item_id   INTEGER,
+     item_type INTEGER,
+     level     INTEGER
+  )
