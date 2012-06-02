@@ -14,7 +14,8 @@ CREATE TABLE users
      cordy             TEXT,
      path_ttl          NUMERIC,
      registration_date TEXT DEFAULT CURRENT_TIMESTAMP,
-     last_login        TEXT DEFAULT CURRENT_TIMESTAMP
+     last_login        TEXT DEFAULT CURRENT_TIMESTAMP,
+     admin             BOOL
   )
 
 CREATE TABLE events
