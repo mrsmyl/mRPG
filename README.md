@@ -10,10 +10,8 @@ Upcoming Features
 ------------
 View our [milestones](https://github.com/mozor/mRPG/issues/milestones) for a complete list.
 
-* Version control
 * Battles
 * Quests
-* Items
 
 Web Component
 ------------
