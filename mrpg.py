@@ -2,7 +2,7 @@
 
 # mRPG
 # https://github.com/mozor/mRPG
-# Version 0.4
+# Version 0.31
 #
 # Copyright 2012 Greg (NeWtoz@mozor.net) & Richard (richard@mozor.net);
 # This work is licensed under the Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
@@ -20,7 +20,7 @@ from passlib.hash import sha512_crypt as sc
 
 # Global Variables
 is_started = 0
-min_schema_ver_needed = 0.4
+min_schema_ver_needed = 0.31
 
 class mrpg:
     def __init__(self, parent):
@@ -72,21 +72,19 @@ class mrpg:
     def performPenalty(self, user, reason):
         self.db = DBPool('mrpg.db')
         self.db.mrpg = self
-        print "in penalty function"
+        # print "in penalty function"
         global is_started
-        print is_started
+        # print is_started
         if is_started == 1:
-            print "is_started"
+            # print "is_started"
             is_online = yield self.db.is_user_online(user)
             if is_online:
-                print "isonline"
+                # print "isonline"
                 if is_online[0][0] == 1:
-                    print "really is online"
+                    # print "really is online"
                     self.msg(user + " has earned a penalty for: " + reason)
                     self.db.updateUserTimeMultiplier(user, penalty_constant)
                     self.db.getSingleUser(user)
-            else:
-                print "isnt online"
         self.db.shutdown("")
 
     def writetofile(self, message):
@@ -104,7 +102,7 @@ class mrpg:
         db.mrpg = self
 
         if(rand <= entropy):
-            print "running event"
+            # print "running event"
             event = yield db.get_event()
             user = yield db.get_random_user(1)
 
@@ -315,7 +313,7 @@ class DBPool:
         for i in output:
             message = str(i[1]) + " will reach the next level in " + str(i[6]) + " seconds."
             mrpg_ref.msg(message)
-            print message
+            # print message
 
     def levelUp(self):
         query = "SELECT username, char_name, level, ttl FROM users WHERE ttl < 0 AND online = 1"
