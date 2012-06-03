@@ -38,3 +38,4 @@
 4, 'leather armor', 1, 0
 4, 'chain mail', 1, 0
 4, 'birthday suit', 0.1, 0
+2, 'zach\'s blue dildo', 32, 1
