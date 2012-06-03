@@ -20,7 +20,7 @@ from passlib.hash import sha512_crypt as sc
 
 # Global Variables
 is_started = 0
-min_schema_ver_needed = 0.31
+min_schema_ver_needed = 0.32
 
 class mrpg:
     def __init__(self, parent):
