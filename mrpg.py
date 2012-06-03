@@ -721,6 +721,7 @@ class Bot(irc.IRCClient):
             pass
         elif(temp[0][0] == hostname):
             self.db.make_user_online(username, hostname)
+            self.mode(self.factory.channel, True, 'v', user=username)
             print "User: " + username + " with Host: " + hostname + " is being auto logged in"
         else:
             print "User: " + username + " with Host: " + hostname + " didn't qualify for auto login"
