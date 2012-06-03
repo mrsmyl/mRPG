@@ -15,4 +15,14 @@
 
 # Insert Our Events
 
+'discovered Mozor','calamity',1.1
+'ate a poisonous fruit', 'calamity', 1.2
+'fell in love with zach','terrible calamity',1.9
+'saw the light (which unfortunately ended up being a train)','terrible calamity',1.6
+'discovered Mozor', 'godsend', 0.9
+'found a $10 bill', 'godsend', 0.9
+'had the internet fail', 'really horrible calamity', 1.9
+'discovered the one true love of Pyotr: Ikea', 'weird thing', 1.1
+'discovered their ex had stolen all their stuff and turned out to be a monster', 'surprisingly common occurrence', 1.1
+'went to https://github.com/mozor/mRPG/issues/new and reported bugs', 'really good idea yet seldom done thing', 0.5
 
